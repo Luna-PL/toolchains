@@ -1,13 +1,16 @@
 {
   "name": "luna-language",
   "displayName": "Luna Language Support (Alpha)",
-  "description": "Luna highlighting, saved-file diagnostics, symbols, and folding.",
+  "description": "Luna highlighting, formatting, saved-file diagnostics, symbols, and folding.",
   "version": "0.1.0",
   "private": true,
   "engines": {
     "vscode": "^1.91.0"
   },
   "main": "./extension.js",
+  "scripts": {
+    "check": "node --check extension.js && node scripts/validate-json.js"
+  },
   "activationEvents": [
     "onLanguage:luna",
     "onCommand:luna.restartLanguageServer"
@@ -51,6 +54,12 @@
           "default": "",
           "scope": "machine",
           "description": "Optional explicit path to the Luna compiler. Empty uses LUNA_BIN, PATH, then the development fallback."
+        },
+        "luna.formatter.path": {
+          "type": "string",
+          "default": "luna-fmt",
+          "scope": "machine",
+          "description": "Path to the luna-fmt executable."
         }
       }
     }

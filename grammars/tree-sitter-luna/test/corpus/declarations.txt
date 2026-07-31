@@ -1,0 +1,76 @@
+==================
+Headers and declarations
+==================
+
+package org.example.app;
+module data::main;
+using org.luna.core as core;
+
+export runtime@release(1, 0, 0) fn main() -> i32 {
+  // comments remain visible
+  return 0;
+}
+
+nominal struct Point {
+  x: i32;
+  y: i32;
+}
+
+extern "C" fn foreign(value: i32) -> i32;
+
+---
+
+(source_file
+  (package_header
+    (package_id
+      (identifier)
+      (identifier)
+      (identifier)))
+  (module_header
+    (module_path
+      (identifier)
+      (identifier)))
+  (using_header
+    (package_id
+      (identifier)
+      (identifier)
+      (identifier))
+    (identifier))
+  (declaration
+    (metadata_attachment
+      (identifier)
+      (parenthesized
+        (number)
+        (punctuation)
+        (number)
+        (punctuation)
+        (number)))
+    (identifier)
+    (parenthesized)
+    (operator)
+    (identifier)
+    (block
+      (line_comment)
+      (identifier)
+      (number)
+      (punctuation)))
+  (declaration
+    (identifier)
+    (block
+      (identifier)
+      (punctuation)
+      (identifier)
+      (punctuation)
+      (identifier)
+      (punctuation)
+      (identifier)
+      (punctuation)))
+  (declaration
+    (string)
+    (identifier)
+    (parenthesized
+      (identifier)
+      (punctuation)
+      (identifier))
+    (operator)
+    (identifier)))

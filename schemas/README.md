@@ -1,6 +1,7 @@
 # Luna manifest schemas
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 Planned JSON Schema projections for `luna.package`, `luna.workspace`, and
 `luna.lock`. The Luna compiler remains authoritative; schemas are generated or
 tested against its documented manifest contract rather than extended here.
-

@@ -1,0 +1,97 @@
+name: Toolchain CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: toolchain-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  LUNA_FIXTURE_COMMIT: a83bde0c2b172c31c0dcdf22dfa5b22fa166c8ce
+
+jobs:
+  verify:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            runner: ubuntu-24.04
+          - name: macOS
+            runner: macos-14
+          - name: Windows
+            runner: windows-2022
+
+    steps:
+      - name: Check out LunaToolchain
+        uses: actions/checkout@v6
+
+      - name: Check out compatible Luna fixtures
+        uses: actions/checkout@v6
+        with:
+          repository: Luna-PL/Luna
+          ref: ${{ env.LUNA_FIXTURE_COMMIT }}
+          path: .ci/luna
+          persist-credentials: false
+
+      - name: Install Rust 1.89
+        uses: dtolnay/rust-toolchain@1.89.0
+        with:
+          components: clippy, rustfmt
+
+      - name: Install Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            editors/vscode/package-lock.json
+            grammars/tree-sitter-luna/package-lock.json
+
+      - name: Install Tree-sitter dependencies
+        run: npm --prefix grammars/tree-sitter-luna ci
+
+      - name: Install VS Code client dependencies
+        run: npm --prefix editors/vscode ci
+
+      - name: Check Rust formatting
+        run: cargo fmt --all --check
+
+      - name: Test Rust workspace
+        run: cargo test --workspace --locked
+
+      - name: Lint Rust workspace
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Build release binaries
+        run: cargo build --workspace --release --locked
+
+      - name: Generate Tree-sitter parser
+        run: npm --prefix grammars/tree-sitter-luna run generate
+
+      - name: Check generated parser is committed
+        run: git diff --exit-code -- grammars/tree-sitter-luna/src
+
+      - name: Test Tree-sitter grammar
+        run: npm --prefix grammars/tree-sitter-luna test
+
+      - name: Check grammar against Luna fixtures
+        run: npm --prefix grammars/tree-sitter-luna run test:compiler
+        env:
+          LUNA_SOURCE_DIR: ${{ github.workspace }}/.ci/luna
+
+      - name: Check VS Code client sources
+        run: npm --prefix editors/vscode run check
+
+      - name: Check VS Code client dependencies
+        run: npm --prefix editors/vscode ls --depth=0

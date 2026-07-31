@@ -5,9 +5,10 @@
 LunaToolchain 是 Luna `0.2.0-alpha` 的独立编辑器与开发者工具工作区。本地开发时
 它位于编译器目录内，但具有独立的 Git 历史、发布、兼容策略和版本号。
 
-当前状态为 M2 最小 language server。`luna-protocol` 校验编译器 JSONL，
+当前状态为 M3 语法与格式化。`luna-protocol` 校验编译器 JSONL，
 `luna-compiler` 发现兼容编译器并执行检查，`luna-lsp` 通过 stdio 提供已保存文件
-诊断、document symbol 和 folding。格式化与语义导航仍在规划中。
+诊断、document symbol 和 folding。生成的 Tree-sitter grammar 与 `luna-fmt` 提供
+无损、保留注释的全文格式化；语义导航仍在规划中。
 
 ## 仓库边界
 
@@ -16,16 +17,25 @@ LunaToolchain 是 Luna `0.2.0-alpha` 的独立编辑器与开发者工具工作�
 - 工具不得从渲染后的诊断文本推断语义，也不得链接编译器私有 C++ 类。
 
 详细设计见[架构](docs/architecture.zh-CN.md)、[协议](docs/protocol.zh-CN.md)、
-[language server 支持范围](docs/language_server.zh-CN.md)和
-[交付路线图](docs/roadmap.zh-CN.md)。
+[language server 支持范围](docs/language_server.zh-CN.md)、
+[formatter 支持范围](docs/formatter.zh-CN.md)和[交付路线图](docs/roadmap.zh-CN.md)。
 
 ## 本地验证
 
 ```sh
 cargo test --workspace --offline
-node -e 'JSON.parse(require("fs").readFileSync("editors/vscode/package.json"))'
+npm --prefix grammars/tree-sitter-luna ci
+npm --prefix grammars/tree-sitter-luna test
+npm --prefix editors/vscode run check
 cargo run --offline -p luna-tools -- compiler --luna /path/to/luna
 ```
 
 编译器发现依次检查显式 `--luna`/`LUNA_BIN`、`PATH`，最后在本地开发候选
 `../build/luna` 存在时检查它。任何候选都必须同时通过 `--version` 和诊断协议探测。
+
+## 持续集成
+
+`.github/workflows/ci.yml` 在 Ubuntu 24.04、macOS 14 和 Windows Server 2022 上执行
+相同的 Rust、Tree-sitter 与 VS Code client 检查。grammar conformance 固定到兼容的
+`Luna-PL/Luna` commit，确保编译器 fixture 变化经过显式评审。在 CI 接入兼容的
+预编译 compiler package 前，启动真实 Luna 编译器的测试仍为可选项。

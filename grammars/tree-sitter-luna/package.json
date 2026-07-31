@@ -1,0 +1,15 @@
+{
+  "name": "tree-sitter-luna",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lossless structural Tree-sitter grammar for Luna",
+  "license": "MIT OR Apache-2.0",
+  "scripts": {
+    "generate": "tree-sitter generate",
+    "test": "node scripts/test.js",
+    "test:compiler": "node scripts/compiler-conformance.js"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "0.26.11"
+  }
+}

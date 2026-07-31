@@ -36,6 +36,9 @@ Exit: VS Code can start/stop the server repeatedly without leaked processes.
 
 ## M3: lossless syntax and formatter
 
+Status: implemented locally with a three-platform CI workflow; broader corpus,
+successful remote CI runs, and editor-host evidence remain before release.
+
 - Tree-sitter Luna grammar with compiler conformance fixtures.
 - Comment-preserving full-document formatter and `--check` mode.
 - Idempotence and malformed-input tests; range formatting follows later.

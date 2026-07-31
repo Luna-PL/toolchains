@@ -33,6 +33,9 @@
 
 ## M3：无损语法和 formatter
 
+状态：本地实现完成并已加入三平台 CI workflow；发布前仍需扩大 corpus、取得远程
+CI 成功记录，并补齐 editor-host 证据。
+
 - Tree-sitter Luna grammar 及编译器一致性 fixture。
 - 保留注释的全文 formatter 和 `--check`。
 - 幂等及错误输入测试；range formatting 后续再做。

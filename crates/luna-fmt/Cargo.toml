@@ -5,7 +5,17 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 
+[dependencies]
+tree-sitter.workspace = true
+tree-sitter-luna = { path = "../../grammars/tree-sitter-luna" }
+
+[dev-dependencies]
+luna-compiler = { path = "../luna-compiler" }
+luna-protocol = { path = "../luna-protocol" }
+
+[lib]
+path = "src/lib.rs"
+
 [[bin]]
 name = "luna-fmt"
 path = "src/main.rs"
-
