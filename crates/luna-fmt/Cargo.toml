@@ -1,0 +1,11 @@
+[package]
+name = "luna-fmt"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "luna-fmt"
+path = "src/main.rs"
+

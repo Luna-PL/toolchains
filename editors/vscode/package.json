@@ -1,0 +1,31 @@
+{
+  "name": "luna-language",
+  "displayName": "Luna Language Support (Alpha)",
+  "description": "Basic language registration and lexical highlighting for Luna.",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "luna",
+        "aliases": ["Luna", "luna"],
+        "extensions": [".luna"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "luna",
+        "scopeName": "source.luna",
+        "path": "./syntaxes/luna.tmLanguage.json"
+      }
+    ]
+  }
+}
+

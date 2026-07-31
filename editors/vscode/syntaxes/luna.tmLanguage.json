@@ -1,0 +1,70 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Luna",
+  "scopeName": "source.luna",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#types" },
+    { "include": "#keywords" },
+    { "include": "#functions" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "name": "comment.line.double-slash.luna", "match": "//.*$" }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.luna",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            { "name": "constant.character.escape.luna", "match": "\\\\[nt\\\\\"]" }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        { "name": "constant.numeric.luna", "match": "\\b[0-9]+(?:\\.[0-9]+)?\\b" }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "support.type.builtin.luna",
+          "match": "\\b(?:i32|i64|f32|f64|bool|unit|never|string|cstr|usize|array|slice|raw|Result|Option|device_buffer|event)\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.luna",
+          "match": "\\b(?:if|else|while|for|in|match|return|move|borrow|free|await|launch|resume|abort)\\b"
+        },
+        {
+          "name": "storage.type.luna",
+          "match": "\\b(?:fn|let|struct|record|enum|trait|impl|package|module|using|export|extern|linear|nominal|metadata|selector|fragment|interceptor|context|slot|apply|new|rc|arc)\\b"
+        },
+        {
+          "name": "constant.language.luna",
+          "match": "\\b(?:true|false)\\b"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.luna",
+          "match": "(?<=\\bfn\\s)[A-Za-z_][A-Za-z0-9_]*"
+        }
+      ]
+    }
+  }
+}
+

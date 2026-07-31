@@ -1,0 +1,13 @@
+[package]
+name = "luna-tools"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+luna-compiler = { path = "../luna-compiler" }
+
+[[bin]]
+name = "luna-tools"
+path = "src/main.rs"

@@ -1,0 +1,58 @@
+# LunaToolchain delivery roadmap
+
+[English](roadmap.md) | [简体中文](roadmap.zh-CN.md)
+
+## M0: repository and contracts
+
+- Independent Git repository and Rust workspace.
+- English-default documentation with Chinese companions.
+- Diagnostic protocol v1 proposal and compatibility policy.
+- Declarative VS Code language registration.
+
+Exit: repository tests run without downloading the Luna compiler.
+
+## M1: compiler diagnostic bridge
+
+Status: implemented locally; cross-platform CI evidence remains before release.
+
+- Luna compiler implements structured diagnostics and JSONL output.
+- `luna-protocol` owns validated protocol types and golden fixtures.
+- Compiler discovery uses explicit configuration, `PATH`, then a local
+  development fallback; every selected binary is version-probed.
+
+Exit: saved-file diagnostics are stable on Linux, macOS, and Windows.
+
+## M2: minimal language server
+
+- LSP stdio lifecycle and incremental document synchronization.
+- Debounced saved-file checks, diagnostic publication, document symbols, and
+  folding ranges.
+- Package/workspace root discovery without reimplementing package semantics.
+
+Exit: VS Code can start/stop the server repeatedly without leaked processes.
+
+## M3: lossless syntax and formatter
+
+- Tree-sitter Luna grammar with compiler conformance fixtures.
+- Comment-preserving full-document formatter and `--check` mode.
+- Idempotence and malformed-input tests; range formatting follows later.
+
+Exit: formatting twice is byte-identical to formatting once.
+
+## M4: semantic editor features
+
+- Compiler-owned analysis protocol and document overlays.
+- Hover, definition, completion, references, and rename in that order.
+- Feature gates follow protocol capabilities, not guessed compiler versions.
+
+Exit: cross-file package examples pass semantic LSP integration tests.
+
+## M5: build, package, and distribution
+
+- Check/build/run/test tasks, test selection, workspace status, and local cache
+  reporting.
+- Prebuilt `luna-lsp` artifacts, VSIX packaging, checksums, and a compatibility
+  matrix pinned to compiler commits and protocol versions.
+
+Remote registries, debugger support, and language-surface expansion are not in
+the 0.1 plan.
