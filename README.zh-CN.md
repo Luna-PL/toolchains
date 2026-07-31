@@ -18,7 +18,8 @@ LunaToolchain 是 Luna `0.2.0-alpha` 的独立编辑器与开发者工具工作�
 
 详细设计见[架构](docs/architecture.zh-CN.md)、[协议](docs/protocol.zh-CN.md)、
 [language server 支持范围](docs/language_server.zh-CN.md)、
-[formatter 支持范围](docs/formatter.zh-CN.md)和[交付路线图](docs/roadmap.zh-CN.md)。
+[formatter 支持范围](docs/formatter.zh-CN.md)、[分发](docs/distribution.zh-CN.md)和
+[交付路线图](docs/roadmap.zh-CN.md)。
 
 ## 本地验证
 
@@ -35,9 +36,15 @@ cargo run --offline -p luna-tools -- compiler --luna /path/to/luna
 
 ## 持续集成
 
-`.github/workflows/ci.yml` 在 Ubuntu 24.04、macOS 14 和 Windows Server 2022 上执行
+`.github/workflows/ci.yml` 在 Ubuntu 24.04、macOS 15 和 Windows Server 2022 上执行
 相同的 Rust、Tree-sitter 与 VS Code client 检查。普通 push 和 pull request 的
 grammar conformance 跟踪 `Luna-PL/Luna:main`，以尽早发现语言漂移；手动运行时可以
 指定任意 Luna branch、tag 或 commit。Release 兼容性将另行固定到 Luna release
 tag。在 CI 接入兼容的预编译 compiler package 前，启动真实 Luna 编译器的测试仍为
 可选项。
+
+## Release
+
+版本 tag 会生成 Linux x86_64、macOS arm64 和 Windows x86_64 命令行 archive、
+内置 `luna-lsp`/`luna-fmt` 的平台 VSIX，以及 SHA-256 checksum。内容、安装方式及
+独立 Luna compiler 要求见[分发文档](docs/distribution.zh-CN.md)。

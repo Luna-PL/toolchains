@@ -24,8 +24,8 @@ Exit: saved-file diagnostics are stable on Linux, macOS, and Windows.
 
 ## M2: minimal language server
 
-Status: implemented locally; editor-host and cross-platform CI evidence remain
-before release.
+Status: implemented and covered by three-platform process-level CI; editor-host
+evidence remains before release.
 
 - LSP stdio lifecycle and incremental document synchronization.
 - Debounced saved-file checks, diagnostic publication, document symbols, and
@@ -36,8 +36,8 @@ Exit: VS Code can start/stop the server repeatedly without leaked processes.
 
 ## M3: lossless syntax and formatter
 
-Status: implemented locally with a three-platform CI workflow; broader corpus,
-successful remote CI runs, and editor-host evidence remain before release.
+Status: implemented and passing three-platform CI; broader corpus and
+editor-host evidence remain before release.
 
 - Tree-sitter Luna grammar with compiler conformance fixtures.
 - Comment-preserving full-document formatter and `--check` mode.
@@ -55,10 +55,14 @@ Exit: cross-file package examples pass semantic LSP integration tests.
 
 ## M5: build, package, and distribution
 
+Status: three-platform binary archives, bundled platform VSIX packages,
+checksums, and a compatibility manifest are implemented. Developer task and
+cache commands remain planned.
+
 - Check/build/run/test tasks, test selection, workspace status, and local cache
   reporting.
 - Prebuilt `luna-lsp` artifacts, VSIX packaging, checksums, and a compatibility
-  matrix pinned to compiler commits and protocol versions.
+  matrix pinned to compiler releases and protocol versions.
 
 Remote registries, debugger support, and language-surface expansion are not in
 the 0.1 plan.

@@ -1,0 +1,157 @@
+name: Toolchain release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag, for example v0.1.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+jobs:
+  package:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            runner: ubuntu-24.04
+            platform: linux-x86_64
+            vscode-target: linux-x64
+            archive: tar.gz
+          - name: macOS arm64
+            runner: macos-15
+            platform: macos-arm64
+            vscode-target: darwin-arm64
+            archive: tar.gz
+          - name: Windows x86_64
+            runner: windows-2022
+            platform: windows-x86_64
+            vscode-target: win32-x64
+            archive: zip
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          persist-credentials: false
+
+      - name: Install Rust 1.89
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Install Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+
+      - name: Install VS Code packaging dependencies
+        run: npm --prefix editors/vscode ci
+
+      - name: Verify release versions
+        run: node scripts/release/verify-version.js
+
+      - name: Test Rust workspace
+        run: cargo test --workspace --locked
+
+      - name: Build release binaries
+        run: cargo build --workspace --release --locked
+
+      - name: Create package staging directory
+        run: |
+          node -e "require('node:fs').mkdirSync('dist', { recursive: true })"
+
+      - name: Stage bundled editor binaries
+        run: npm --prefix editors/vscode run stage:binaries
+
+      - name: Check VS Code client
+        run: npm --prefix editors/vscode run check
+
+      - name: Package VSIX
+        run: npm --prefix editors/vscode run package:vsix -- --target ${{ matrix.vscode-target }} --out ../../dist/luna-language-${{ env.RELEASE_TAG }}-${{ matrix.vscode-target }}.vsix
+
+      - name: Package Unix archive
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          version="${RELEASE_TAG#v}"
+          package="luna-toolchain-${version}-${{ matrix.platform }}"
+          mkdir -p "dist/${package}/bin" "dist/${package}/compatibility" "dist/${package}/docs"
+          cp target/release/luna-lsp target/release/luna-fmt target/release/luna-tools "dist/${package}/bin/"
+          cp README.md README.zh-CN.md LICENSE LICENSE-MIT LICENSE-APACHE "dist/${package}/"
+          cp compatibility/luna.json "dist/${package}/compatibility/"
+          cp docs/*.md "dist/${package}/docs/"
+          tar -C dist -czf "dist/${package}.tar.gz" "${package}"
+
+      - name: Package Windows archive
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $version = $env:RELEASE_TAG.TrimStart('v')
+          $package = "luna-toolchain-$version-${{ matrix.platform }}"
+          $packageRoot = Join-Path dist $package
+          New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot bin), (Join-Path $packageRoot compatibility), (Join-Path $packageRoot docs)
+          Copy-Item target/release/luna-lsp.exe,target/release/luna-fmt.exe,target/release/luna-tools.exe (Join-Path $packageRoot bin)
+          Copy-Item README.md,README.zh-CN.md,LICENSE,LICENSE-MIT,LICENSE-APACHE $packageRoot
+          Copy-Item compatibility/luna.json (Join-Path $packageRoot compatibility)
+          Copy-Item docs/*.md (Join-Path $packageRoot docs)
+          Compress-Archive -Path $packageRoot -DestinationPath "dist/$package.zip"
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.platform }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.vsix
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: package
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download package artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Generate SHA-256 checksums
+        shell: bash
+        run: |
+          cd dist
+          sha256sum luna-* > SHA256SUMS
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: LunaToolchain ${{ env.RELEASE_TAG }}
+          prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.vsix
+            dist/SHA256SUMS

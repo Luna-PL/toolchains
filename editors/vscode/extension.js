@@ -1,15 +1,18 @@
 const vscode = require("vscode");
 const { spawn } = require("node:child_process");
+const { existsSync } = require("node:fs");
+const { join } = require("node:path");
 const {
   LanguageClient,
   TransportKind,
 } = require("vscode-languageclient/node");
 
 let client;
+let extensionContext;
 
 function createClient() {
   const configuration = vscode.workspace.getConfiguration("luna");
-  const serverPath = configuration.get("server.path", "luna-lsp");
+  const serverPath = resolveTool("server.path", "luna-lsp");
   const compilerPath = configuration.get("compiler.path", "");
   const environment = { ...process.env };
   if (compilerPath) environment.LUNA_BIN = compilerPath;
@@ -44,6 +47,7 @@ async function stopClient() {
 }
 
 async function activate(context) {
+  extensionContext = context;
   context.subscriptions.push(
     vscode.commands.registerCommand("luna.restartLanguageServer", async () => {
       await stopClient();
@@ -64,9 +68,7 @@ function formatDocument(document, cancellationToken) {
   if (cancellationToken.isCancellationRequested) {
     return Promise.reject(new vscode.CancellationError());
   }
-  const formatterPath = vscode.workspace
-    .getConfiguration("luna")
-    .get("formatter.path", "luna-fmt");
+  const formatterPath = resolveTool("formatter.path", "luna-fmt");
   return new Promise((resolve, reject) => {
     const source = document.getText();
     const child = spawn(formatterPath, ["-"], {
@@ -114,6 +116,21 @@ function formatDocument(document, cancellationToken) {
     });
     child.stdin.end(source, "utf8");
   });
+}
+
+function resolveTool(setting, executable) {
+  const configured = vscode.workspace
+    .getConfiguration("luna")
+    .get(setting, "")
+    .trim();
+  if (configured) return configured;
+  if (extensionContext) {
+    const fileName =
+      process.platform === "win32" ? `${executable}.exe` : executable;
+    const bundled = extensionContext.asAbsolutePath(join("bin", fileName));
+    if (existsSync(bundled)) return bundled;
+  }
+  return executable;
 }
 
 module.exports = { activate, deactivate };

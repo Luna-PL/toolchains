@@ -1,6 +1,7 @@
 /target/
 **/node_modules/
 **/dist/
+/editors/vscode/bin/
+/editors/vscode/compatibility.json
 *.vsix
 .DS_Store
-

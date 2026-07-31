@@ -15,3 +15,7 @@ Server** after changing either path.
 
 Set `luna.formatter.path` when `luna-fmt` is not on `PATH`. Formatting sends the
 current editor snapshot over stdin and does not run compiler diagnostics on it.
+
+Platform release VSIX packages bundle `luna-lsp` and `luna-fmt`. Empty server
+and formatter path settings prefer those binaries and otherwise fall back to
+`PATH`. The Luna compiler remains a separate installation.

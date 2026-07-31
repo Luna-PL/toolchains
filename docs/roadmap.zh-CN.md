@@ -23,7 +23,7 @@
 
 ## M2：最小 language server
 
-状态：本地实现完成；发布前仍需补齐 editor host 与跨平台 CI 证据。
+状态：实现完成并已通过三平台进程级 CI；发布前仍需补齐 editor host 证据。
 
 - LSP stdio 生命周期和增量文档同步。
 - debounce 后执行已保存文件检查，发布诊断、document symbol 和 folding range。
@@ -33,8 +33,8 @@
 
 ## M3：无损语法和 formatter
 
-状态：本地实现完成并已加入三平台 CI workflow；发布前仍需扩大 corpus、取得远程
-CI 成功记录，并补齐 editor-host 证据。
+状态：实现完成并已通过三平台 CI；发布前仍需扩大 corpus 并补齐
+editor-host 证据。
 
 - Tree-sitter Luna grammar 及编译器一致性 fixture。
 - 保留注释的全文 formatter 和 `--check`。
@@ -52,8 +52,11 @@ CI 成功记录，并补齐 editor-host 证据。
 
 ## M5：构建、package 与分发
 
+状态：三平台 binary archive、内置 binary 的平台 VSIX、checksum 和兼容性 manifest
+已实现；开发者 task 与 cache 命令仍在规划中。
+
 - check/build/run/test task、测试选择、workspace 状态和本地缓存报告。
-- `luna-lsp` 预编译产物、VSIX、checksum，以及绑定 compiler commit 与协议版本的
+- `luna-lsp` 预编译产物、VSIX、checksum，以及绑定 compiler release 与协议版本的
   compatibility matrix。
 
 远程 registry、调试器和语言表面扩张不属于 0.1 计划。

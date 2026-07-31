@@ -4,12 +4,33 @@
   "description": "Luna highlighting, formatting, saved-file diagnostics, symbols, and folding.",
   "version": "0.1.0",
   "private": true,
+  "publisher": "luna-pl",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Luna-PL/toolchains.git",
+    "directory": "editors/vscode"
+  },
+  "files": [
+    "bin/**",
+    "compatibility.json",
+    "extension.js",
+    "language-configuration.json",
+    "syntaxes/**",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
   "engines": {
     "vscode": "^1.91.0"
   },
   "main": "./extension.js",
   "scripts": {
-    "check": "node --check extension.js && node scripts/validate-json.js"
+    "check": "node --check extension.js && node scripts/validate-json.js",
+    "stage:binaries": "node scripts/stage-binaries.js",
+    "package:vsix": "vsce package"
   },
   "activationEvents": [
     "onLanguage:luna",
@@ -22,8 +43,13 @@
     "languages": [
       {
         "id": "luna",
-        "aliases": ["Luna", "luna"],
-        "extensions": [".luna"],
+        "aliases": [
+          "Luna",
+          "luna"
+        ],
+        "extensions": [
+          ".luna"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -45,9 +71,9 @@
       "properties": {
         "luna.server.path": {
           "type": "string",
-          "default": "luna-lsp",
+          "default": "",
           "scope": "machine",
-          "description": "Path to the luna-lsp executable."
+          "description": "Optional path to luna-lsp. Empty uses the bundled binary, then PATH."
         },
         "luna.compiler.path": {
           "type": "string",
@@ -57,14 +83,17 @@
         },
         "luna.formatter.path": {
           "type": "string",
-          "default": "luna-fmt",
+          "default": "",
           "scope": "machine",
-          "description": "Path to the luna-fmt executable."
+          "description": "Optional path to luna-fmt. Empty uses the bundled binary, then PATH."
         }
       }
     }
   },
   "dependencies": {
     "vscode-languageclient": "^10.1.0"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "3.9.2"
   }
 }

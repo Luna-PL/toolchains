@@ -13,3 +13,6 @@ buffer 的语义诊断。
 
 当 `luna-fmt` 不在 `PATH` 中时设置 `luna.formatter.path`。格式化通过 stdin 传递
 当前 editor snapshot，不会对该未保存内容运行编译器诊断。
+
+平台 Release VSIX 内置 `luna-lsp` 与 `luna-fmt`。server/formatter path 留空时优先
+使用这些 binary，否则 fallback 到 `PATH`；Luna compiler 仍需单独安装。

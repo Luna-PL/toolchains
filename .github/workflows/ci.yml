@@ -32,10 +32,13 @@ jobs:
         include:
           - name: Linux
             runner: ubuntu-24.04
+            vscode-target: linux-x64
           - name: macOS
-            runner: macos-14
+            runner: macos-15
+            vscode-target: darwin-arm64
           - name: Windows
             runner: windows-2022
+            vscode-target: win32-x64
 
     steps:
       - name: Check out LunaToolchain
@@ -100,3 +103,9 @@ jobs:
 
       - name: Check VS Code client dependencies
         run: npm --prefix editors/vscode ls --depth=0
+
+      - name: Stage bundled editor binaries
+        run: npm --prefix editors/vscode run stage:binaries
+
+      - name: Smoke-test VSIX packaging
+        run: npm --prefix editors/vscode run package:vsix -- --target ${{ matrix.vscode-target }} --out ../../luna-language-ci-${{ matrix.vscode-target }}.vsix
