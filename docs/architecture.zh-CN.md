@@ -2,7 +2,7 @@
 
 [English](architecture.md) | [简体中文](architecture.zh-CN.md)
 
-> 状态：M1 诊断桥已实现；LSP 与 formatter 仍为规划状态
+> 状态：M2 最小 language server 已实现；formatter 仍为规划状态
 > 适用：LunaToolchain 0.1 开发期
 
 ## 依赖方向

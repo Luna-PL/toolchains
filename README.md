@@ -6,11 +6,10 @@ LunaToolchain is the independent editor and developer-tooling workspace for
 Luna `0.2.0-alpha`. It lives beside the compiler during local development but
 has its own Git history, releases, compatibility policy, and version number.
 
-Current status: M1 diagnostic bridge. `luna-protocol` parses and validates the
-compiler's JSONL record sequence against golden fixtures; `luna-compiler`
-discovers and probes compatible compiler executables. The LSP and formatter
-binaries remain placeholders. The declarative VS Code package provides only
-basic language registration and lexical syntax highlighting.
+Current status: M2 minimal language server. `luna-protocol` validates compiler
+JSONL, `luna-compiler` discovers and checks with compatible compilers, and
+`luna-lsp` provides saved-file diagnostics, document symbols, and folding over
+stdio. Formatting and semantic navigation remain planned.
 
 ## Repository boundaries
 
@@ -21,7 +20,8 @@ basic language registration and lexical syntax highlighting.
 - Tooling must not infer semantic truth from rendered compiler messages or
   link against private compiler C++ classes.
 
-See [architecture](docs/architecture.md), [protocol](docs/protocol.md), and the
+See [architecture](docs/architecture.md), [protocol](docs/protocol.md),
+[language-server support](docs/language_server.md), and the
 [delivery roadmap](docs/roadmap.md).
 
 ## Local validation

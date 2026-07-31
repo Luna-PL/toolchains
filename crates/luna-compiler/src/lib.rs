@@ -31,6 +31,59 @@ pub struct Compiler {
     pub identity: CompilerIdentity,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DiagnosticReport {
+    pub records: Vec<Record>,
+}
+
+#[derive(Debug)]
+pub enum CheckError {
+    Spawn(std::io::Error),
+    Failed {
+        status: Option<i32>,
+        stdout: String,
+        stderr: String,
+    },
+    NonUtf8,
+    InvalidJson(String),
+    InvalidSequence(String),
+    CompilerChanged,
+}
+
+impl fmt::Display for CheckError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Spawn(source) => write!(formatter, "cannot run compiler check: {source}"),
+            Self::Failed {
+                status,
+                stdout,
+                stderr,
+            } => write!(
+                formatter,
+                "compiler check failed with status {status:?}; stdout={stdout:?}; stderr={stderr:?}"
+            ),
+            Self::NonUtf8 => write!(formatter, "compiler check output is not UTF-8"),
+            Self::InvalidJson(error) => write!(formatter, "invalid diagnostic JSONL: {error}"),
+            Self::InvalidSequence(error) => {
+                write!(formatter, "invalid diagnostic sequence: {error}")
+            }
+            Self::CompilerChanged => write!(
+                formatter,
+                "compiler identity changed after discovery; rediscovery is required"
+            ),
+        }
+    }
+}
+
+impl Error for CheckError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Spawn(source) => Some(source),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct DiscoveryConfig {
     pub explicit: Option<PathBuf>,
@@ -286,6 +339,50 @@ pub fn probe(path: &Path, source: CandidateSource) -> Result<Compiler, ProbeErro
     identity_from_outputs(path, source, &language_version, &protocol_stdout)
 }
 
+pub fn check_saved(compiler: &Compiler, input: &Path) -> Result<DiagnosticReport, CheckError> {
+    let output = Command::new(&compiler.executable)
+        .arg("check")
+        .arg(input)
+        .arg("--message-format=json")
+        .output()
+        .map_err(CheckError::Spawn)?;
+    if !matches!(output.status.code(), Some(0 | 1)) {
+        return Err(CheckError::Failed {
+            status: output.status.code(),
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        });
+    }
+    let stdout = String::from_utf8(output.stdout).map_err(|_| CheckError::NonUtf8)?;
+    let stderr = String::from_utf8(output.stderr).map_err(|_| CheckError::NonUtf8)?;
+    if !stderr.is_empty() {
+        return Err(CheckError::Failed {
+            status: output.status.code(),
+            stdout,
+            stderr,
+        });
+    }
+    let records =
+        parse_jsonl(&stdout).map_err(|error| CheckError::InvalidJson(error.to_string()))?;
+    validate_sequence(&records).map_err(|error| CheckError::InvalidSequence(error.to_string()))?;
+    let Some(Record::Hello {
+        language_version,
+        compiler_commit,
+        build_target,
+        ..
+    }) = records.first()
+    else {
+        return Err(CheckError::InvalidSequence("missing hello".to_owned()));
+    };
+    if language_version != &compiler.identity.language_version
+        || compiler_commit != &compiler.identity.compiler_commit
+        || build_target != &compiler.identity.build_target
+    {
+        return Err(CheckError::CompilerChanged);
+    }
+    Ok(DiagnosticReport { records })
+}
+
 fn failed(operation: &'static str, output: std::process::Output) -> ProbeError {
     ProbeError::Failed {
         operation,
@@ -462,5 +559,13 @@ mod tests {
             .expect("LUNA_BIN must implement the diagnostic protocol");
         assert_eq!(compiler.identity.language_version, "0.2.0-alpha");
         assert_eq!(compiler.identity.diagnostic_protocol_version, 1);
+
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/minimal.luna");
+        let report =
+            check_saved(&compiler, &source).expect("LUNA_BIN must check a saved standalone source");
+        assert!(matches!(
+            report.records.last(),
+            Some(Record::Summary { success: true, .. })
+        ));
     }
 }

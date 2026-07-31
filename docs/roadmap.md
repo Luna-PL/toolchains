@@ -24,6 +24,9 @@ Exit: saved-file diagnostics are stable on Linux, macOS, and Windows.
 
 ## M2: minimal language server
 
+Status: implemented locally; editor-host and cross-platform CI evidence remain
+before release.
+
 - LSP stdio lifecycle and incremental document synchronization.
 - Debounced saved-file checks, diagnostic publication, document symbols, and
   folding ranges.

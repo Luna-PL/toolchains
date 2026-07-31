@@ -2,7 +2,7 @@
 
 [English](architecture.md) | [简体中文](architecture.zh-CN.md)
 
-> Status: M1 diagnostic bridge implemented; LSP and formatter remain planned
+> Status: M2 minimal language server implemented; formatter remains planned
 > Applies to: LunaToolchain 0.1 development
 
 ## Dependency direction

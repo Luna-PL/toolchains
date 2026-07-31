@@ -23,6 +23,8 @@
 
 ## M2：最小 language server
 
+状态：本地实现完成；发布前仍需补齐 editor host 与跨平台 CI 证据。
+
 - LSP stdio 生命周期和增量文档同步。
 - debounce 后执行已保存文件检查，发布诊断、document symbol 和 folding range。
 - 发现 package/workspace 根，但不重新实现 package 语义。

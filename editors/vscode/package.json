@@ -1,12 +1,17 @@
 {
   "name": "luna-language",
   "displayName": "Luna Language Support (Alpha)",
-  "description": "Basic language registration and lexical highlighting for Luna.",
+  "description": "Luna highlighting, saved-file diagnostics, symbols, and folding.",
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "vscode": "^1.90.0"
+    "vscode": "^1.91.0"
   },
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:luna",
+    "onCommand:luna.restartLanguageServer"
+  ],
   "categories": [
     "Programming Languages"
   ],
@@ -25,7 +30,32 @@
         "scopeName": "source.luna",
         "path": "./syntaxes/luna.tmLanguage.json"
       }
-    ]
+    ],
+    "commands": [
+      {
+        "command": "luna.restartLanguageServer",
+        "title": "Luna: Restart Language Server"
+      }
+    ],
+    "configuration": {
+      "title": "Luna",
+      "properties": {
+        "luna.server.path": {
+          "type": "string",
+          "default": "luna-lsp",
+          "scope": "machine",
+          "description": "Path to the luna-lsp executable."
+        },
+        "luna.compiler.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Optional explicit path to the Luna compiler. Empty uses LUNA_BIN, PATH, then the development fallback."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "^10.1.0"
   }
 }
-

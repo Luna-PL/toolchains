@@ -5,7 +5,15 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 
+[dependencies]
+luna-compiler = { path = "../luna-compiler" }
+luna-protocol = { path = "../luna-protocol" }
+luna-workspace = { path = "../luna-workspace" }
+serde_json.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
 [[bin]]
 name = "luna-lsp"
 path = "src/main.rs"
-

@@ -1,4 +1,3 @@
 fn main() {
-    eprintln!("luna-lsp is planned but not implemented");
-    std::process::exit(2);
+    std::process::exit(luna_lsp::run_stdio());
 }
