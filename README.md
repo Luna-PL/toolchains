@@ -43,6 +43,8 @@ runs both `--version` and a diagnostic-protocol probe.
 
 `.github/workflows/ci.yml` runs the same Rust, Tree-sitter, and VS Code client
 checks on Ubuntu 24.04, macOS 14, and Windows Server 2022. Grammar conformance
-uses a pinned compatible `Luna-PL/Luna` commit so compiler fixture changes are
-reviewed explicitly. Tests that launch a real Luna compiler remain optional
-until CI consumes compatible prebuilt compiler packages.
+tracks `Luna-PL/Luna:main` during normal push and pull-request runs so language
+drift is detected early. A manual run can override this with any Luna branch,
+tag, or commit. Release compatibility will be pinned separately to a Luna
+release tag. Tests that launch a real Luna compiler remain optional until CI
+consumes compatible prebuilt compiler packages.

@@ -36,6 +36,8 @@ cargo run --offline -p luna-tools -- compiler --luna /path/to/luna
 ## 持续集成
 
 `.github/workflows/ci.yml` 在 Ubuntu 24.04、macOS 14 和 Windows Server 2022 上执行
-相同的 Rust、Tree-sitter 与 VS Code client 检查。grammar conformance 固定到兼容的
-`Luna-PL/Luna` commit，确保编译器 fixture 变化经过显式评审。在 CI 接入兼容的
-预编译 compiler package 前，启动真实 Luna 编译器的测试仍为可选项。
+相同的 Rust、Tree-sitter 与 VS Code client 检查。普通 push 和 pull request 的
+grammar conformance 跟踪 `Luna-PL/Luna:main`，以尽早发现语言漂移；手动运行时可以
+指定任意 Luna branch、tag 或 commit。Release 兼容性将另行固定到 Luna release
+tag。在 CI 接入兼容的预编译 compiler package 前，启动真实 Luna 编译器的测试仍为
+可选项。

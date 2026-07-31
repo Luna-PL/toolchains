@@ -51,5 +51,6 @@ folding 暂时仍使用 language server 的保守 scanner，后续仅在有明�
 身份。Luna 长期保持 `0.2.0-alpha` 时仍须显式暴露协议不兼容；客户端按协议版本和
 compiler commit 决定是否启用功能。
 
-三平台 CI matrix 固定 grammar conformance 使用的 Luna 源码 fixture commit。推进
-该 pin 必须经过显式兼容性评审，不能隐式依赖不断变化的编译器默认分支。
+三平台开发 CI 跟踪 Luna 默认分支的源码 fixture，以立即暴露语言漂移；手动运行可
+指定 branch、tag 或 commit。Release 产物则固定兼容的 Luna release tag，保证已发布
+package 可复现。

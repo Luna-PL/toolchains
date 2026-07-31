@@ -57,6 +57,7 @@ protocol, LSP release, and editor-extension release are separate identities.
 Luna remaining at `0.2.0-alpha` must not hide protocol incompatibility; clients
 gate features on explicit protocol versions and compiler commit metadata.
 
-The three-platform CI matrix pins the Luna source-fixture commit used for
-grammar conformance. Advancing that pin is an explicit compatibility review,
-not an implicit dependency on the compiler's moving default branch.
+The three-platform development CI follows the Luna default branch for source
+fixture conformance, exposing language drift immediately. Manual runs can test
+an explicit branch, tag, or commit. Release artifacts instead pin a compatible
+Luna release tag so published packages remain reproducible.

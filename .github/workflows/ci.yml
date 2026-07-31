@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      luna_ref:
+        description: Luna branch, tag, or commit used for grammar conformance
+        required: false
+        default: main
 
 permissions:
   contents: read
@@ -14,7 +19,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  LUNA_FIXTURE_COMMIT: a83bde0c2b172c31c0dcdf22dfa5b22fa166c8ce
+  LUNA_FIXTURE_REF: ${{ inputs.luna_ref || 'main' }}
 
 jobs:
   verify:
@@ -40,7 +45,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: Luna-PL/Luna
-          ref: ${{ env.LUNA_FIXTURE_COMMIT }}
+          ref: ${{ env.LUNA_FIXTURE_REF }}
           path: .ci/luna
           persist-credentials: false
 
