@@ -104,7 +104,7 @@ fn stdio_lifecycle_symbols_folding_and_optional_diagnostics() {
         .expect("language server must start");
     let mut input = child.stdin.take().expect("stdin must be piped");
     let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../tests/fixtures/parse_missing_binding_name.luna");
+        .join("../../tests/fixtures/parse_missing_binding_name.luna");
     let source = std::fs::read_to_string(&fixture).expect("fixture must be readable");
     let uri = file_uri(&fixture);
     let initialization_options = luna_bin
