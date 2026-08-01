@@ -8,8 +8,9 @@ use std::env;
 use std::error::Error;
 use std::ffi::OsString;
 use std::fmt;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output, Stdio};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CandidateSource {
@@ -50,6 +51,7 @@ pub struct AnalysisReport {
 pub enum AnalysisError {
     Unsupported,
     Spawn(std::io::Error),
+    Stdin(std::io::Error),
     Failed {
         status: Option<i32>,
         stdout: String,
@@ -66,6 +68,9 @@ impl fmt::Display for AnalysisError {
         match self {
             Self::Unsupported => write!(formatter, "compiler does not support luna.analysis v1"),
             Self::Spawn(source) => write!(formatter, "cannot run compiler analysis: {source}"),
+            Self::Stdin(source) => {
+                write!(formatter, "cannot send compiler analysis overlay: {source}")
+            }
             Self::Failed {
                 status,
                 stdout,
@@ -88,7 +93,7 @@ impl fmt::Display for AnalysisError {
 impl Error for AnalysisError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::Spawn(source) => Some(source),
+            Self::Spawn(source) | Self::Stdin(source) => Some(source),
             _ => None,
         }
     }
@@ -486,13 +491,7 @@ pub fn check_saved(compiler: &Compiler, input: &Path) -> Result<DiagnosticReport
 }
 
 pub fn analyze_saved(compiler: &Compiler, input: &Path) -> Result<AnalysisReport, AnalysisError> {
-    if compiler.identity.analysis_protocol_version != Some(ANALYSIS_PROTOCOL_VERSION)
-        || !compiler
-            .identity
-            .analysis_capabilities
-            .iter()
-            .any(|capability| capability == "declarations")
-    {
+    if !supports_analysis(compiler, "declarations") {
         return Err(AnalysisError::Unsupported);
     }
     let output = Command::new(&compiler.executable)
@@ -501,6 +500,54 @@ pub fn analyze_saved(compiler: &Compiler, input: &Path) -> Result<AnalysisReport
         .arg("--message-format=json")
         .output()
         .map_err(AnalysisError::Spawn)?;
+    parse_analysis_output(compiler, output)
+}
+
+pub fn analyze_overlay(
+    compiler: &Compiler,
+    input: &Path,
+    document: &Path,
+    source: &str,
+) -> Result<AnalysisReport, AnalysisError> {
+    if !supports_analysis(compiler, "declarations")
+        || !supports_analysis(compiler, "single-document-overlay")
+    {
+        return Err(AnalysisError::Unsupported);
+    }
+    let mut child = Command::new(&compiler.executable)
+        .arg("analyze")
+        .arg(input)
+        .arg("--message-format=json")
+        .arg("--overlay")
+        .arg(document)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(AnalysisError::Spawn)?;
+    child
+        .stdin
+        .take()
+        .expect("piped analysis stdin must be available")
+        .write_all(source.as_bytes())
+        .map_err(AnalysisError::Stdin)?;
+    let output = child.wait_with_output().map_err(AnalysisError::Spawn)?;
+    parse_analysis_output(compiler, output)
+}
+
+fn supports_analysis(compiler: &Compiler, capability: &str) -> bool {
+    compiler.identity.analysis_protocol_version == Some(ANALYSIS_PROTOCOL_VERSION)
+        && compiler
+            .identity
+            .analysis_capabilities
+            .iter()
+            .any(|available| available == capability)
+}
+
+fn parse_analysis_output(
+    compiler: &Compiler,
+    output: Output,
+) -> Result<AnalysisReport, AnalysisError> {
     if !matches!(output.status.code(), Some(0 | 1)) {
         return Err(AnalysisError::Failed {
             status: output.status.code(),
@@ -727,6 +774,13 @@ mod tests {
                 .iter()
                 .any(|capability| capability == "declarations")
         );
+        assert!(
+            compiler
+                .identity
+                .analysis_capabilities
+                .iter()
+                .any(|capability| capability == "single-document-overlay")
+        );
 
         let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/minimal.luna");
         let report =
@@ -746,5 +800,23 @@ mod tests {
                 ..
             })
         ));
+
+        let overlaid = analyze_overlay(
+            &compiler,
+            &source,
+            &source,
+            "// 月\nfn unsaved() -> i32 { return 5; }\nfn main() -> i32 { return unsaved(); }\n",
+        )
+        .expect("LUNA_BIN must analyze an in-memory source overlay");
+        assert!(overlaid.records.iter().any(|record| matches!(
+            record,
+            AnalysisRecord::Symbol { name, .. } if name == "unsaved"
+        )));
+        assert!(
+            overlaid
+                .records
+                .iter()
+                .any(|record| matches!(record, AnalysisRecord::Reference { .. }))
+        );
     }
 }

@@ -11,10 +11,11 @@
 `initialize`, `initialized`, `shutdown`, and `exit`, rejects requests before
 initialization or after shutdown, and leaves no persistent compiler child.
 
-Open documents use incremental UTF-16 synchronization. Changes update only the
-server's memory snapshot and cancel pending checks. A check is scheduled after
-open only when that snapshot exactly matches disk, and after `didSave`; saves
-within 150 ms are coalesced.
+Open documents use incremental UTF-16 synchronization. Changes update the
+server's versioned memory snapshot, invalidate older semantic results, and
+schedule analysis. Events within 150 ms are coalesced. A compiler advertising
+`single-document-overlay` receives dirty text over stdin; otherwise dirty
+documents retain the lexical fallback.
 
 ## Diagnostics
 
@@ -30,16 +31,25 @@ cleared after a successful recheck or close.
 The current server provides `textDocument/documentSymbol` and
 `textDocument/foldingRange`. After a successful saved-file analysis,
 document symbols use compiler-owned declaration IDs, kinds, signatures, and
-selection spans. Dirty documents and compilers without `luna.analysis` retain
-the lexical declaration fallback. Folding remains a structural aid that tracks
-balanced braces outside comments and strings.
+selection spans. A complete, version-matched overlay provides the same symbols
+for a dirty document. Until that result arrives, or with an older compiler, the
+server retains the lexical declaration fallback. Folding remains a structural
+aid that tracks balanced braces outside comments and strings.
 
 `textDocument/definition` is advertised only when the compiler reports the
-`call-references` capability. It resolves direct function calls by opaque
-Symbol ID in a complete saved-file snapshot. Dirty documents return no
-definition until overlay support exists. Hover, completion, workspace
-references, and rename remain disabled until the compiler protocol exposes the
+`call-references`, `method-references`, `type-references`, or
+`trait-references` capability. It resolves direct functions, user trait
+methods, type-syntax names, and impl/bound trait names by opaque Symbol ID in a
+complete saved-file or version-matched overlay snapshot. Constructor and field
+references are not yet covered. Hover,
+completion, workspace references, and rename remain disabled until the compiler protocol exposes the
 additional semantic records each operation requires.
+
+The current overlay capability replaces one root-package document. When
+several files in the same package are dirty, each analysis sees the requested
+document plus disk versions of the others; multi-document overlay remains a
+separate protocol milestone. Dirty-buffer diagnostics also remain pending a
+structured diagnostic-overlay capability.
 
 ## VS Code configuration
 

@@ -11,9 +11,9 @@
 `initialize`、`initialized`、`shutdown` 和 `exit`，拒绝初始化前或 shutdown 后的
 请求，并且不会留下持久编译器子进程。
 
-打开的文档使用增量 UTF-16 同步。修改只更新 server 的内存 snapshot，并取消待执行
-检查。仅当打开时 snapshot 与磁盘完全一致，或收到 `didSave` 后才安排检查；150ms
-内的连续保存会合并。
+打开的文档使用增量 UTF-16 同步。修改会更新带版本的内存 snapshot、使旧语义结果
+失效并安排分析；150ms 内的事件会合并。编译器报告 `single-document-overlay` 时，脏
+文本通过 stdin 传入；否则脏文档继续使用词法 fallback。
 
 ## 诊断
 
@@ -26,13 +26,20 @@ server 在初始化期间发现兼容编译器，并对最近的 package、works
 
 当前提供 `textDocument/documentSymbol` 和 `textDocument/foldingRange`。保存文件成功
 分析后，document symbol 使用编译器拥有的声明 ID、kind、签名
-和 selection span。脏文档或不支持 `luna.analysis` 的编译器继续使用词法声明 fallback。
+和 selection span。完整且版本匹配的 overlay 为脏文档提供相同能力；结果返回前或
+编译器较旧时继续使用词法声明 fallback。
 folding 仍跟踪注释和字符串之外的配对大括号。
 
-仅当编译器报告 `call-references` capability 时才声明 `textDocument/definition`。它在
-完整的保存文件快照中通过不透明 Symbol ID 解析直接函数调用；overlay 实现前，脏文档
-不返回 definition。hover、completion、workspace reference 和 rename 仍需编译器协议
+仅当编译器报告 `call-references`、`method-references`、`type-references` 或
+`trait-references` capability 时才声明 `textDocument/definition`。它在完整的保存文件或版本匹配的
+overlay 快照中通过不透明 Symbol ID 解析直接函数、用户 trait method、类型语法名称和
+impl/bound trait 名称；构造器和字段引用尚未覆盖。
+hover、completion、workspace reference 和 rename 仍需编译器协议
 提供各自所需的更多语义记录，目前保持禁用。
+
+当前 overlay capability 只替换根 package 中一个文档。同一 package 有多个脏文件时，
+每次分析只看到请求文档和其他文件的磁盘版本；多文档 overlay 是独立的后续协议里程碑。
+脏 buffer 诊断也要等待结构化 diagnostic-overlay capability。
 
 ## VS Code 配置
 

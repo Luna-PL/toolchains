@@ -70,9 +70,14 @@ identity, unsupported version, invalid ordering, or inconsistent summary.
 `luna.analysis` v1 is a newline-delimited semantic snapshot. One invocation
 emits exactly one `hello`, zero or more `symbol` and `reference` records, and
 exactly one `summary`. The `declarations` capability carries compiler-owned
-symbol identity and types. `call-references` adds resolved direct-call targets;
-it does not claim support for every reference class or an unsaved-document
-overlay.
+symbol identity and types. `call-references` adds resolved direct-call targets.
+`method-references` adds resolved user trait-method targets.
+`type-references` adds user struct, enum, and metadata-schema names appearing
+in type syntax. `trait-references` adds resolved trait names in impls and
+bounds.
+`single-document-overlay` accepts one real source path through `--overlay` and
+reads its replacement UTF-8 text from stdin while resolving the selected
+package normally.
 
 ```json
 {
@@ -107,12 +112,15 @@ The summary reports the numbers of symbol and reference records plus
 A `reference` contains a source span and an opaque `target_id` that must name a
 symbol in the same snapshot. Clients may implement definition only for the
 reference classes explicitly named by capabilities; v1 currently guarantees
-direct function calls through `call-references`.
+direct function calls through `call-references` and resolved user trait-method
+calls through `method-references`. `type-references` covers resolved user type
+names in type syntax; `trait-references` covers impl and bound trait names.
 
 The Rust wire types and sequence validator are implemented in
 `luna-protocol`. The companion compiler producer and capability-gated
 `luna-compiler` client are implemented. Definition is enabled for complete
 saved-file snapshots with
-`call-references`. Hover, workspace references, completion, and rename must use
+any advertised reference capability; a complete version-matched overlay
+snapshot has the same semantics. Hover, workspace references, completion, and rename must use
 future explicit capabilities and must not be inferred from MoonIR names or
 rendered diagnostics.

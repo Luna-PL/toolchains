@@ -31,9 +31,10 @@
 `luna-compiler` 按显式配置、`PATH`、本地开发 fallback 的顺序发现候选，并且仅在
 候选同时通过 `--version` 和 `luna.diagnostic` JSONL 身份探测后才接受，随后独立探测
 可选的 `luna.analysis` 身份与 capability。首版
-language server 消费该 API；人类可读 stderr 不是稳定 API。首个支持模式是已保存
-文件诊断；未保存 buffer 必须等待编译器 overlay 或 daemon 协议，不能通过伪造临时
-package 布局实现。
+language server 消费该 API；人类可读 stderr 不是稳定 API，保存文件诊断仍保持独立。
+报告 `single-document-overlay` 的编译器通过 stdin 接收当前文档，同时正常加载 package
+其余文件，不创建临时 package 布局。要在一个快照中组合多个脏文件，仍需后续多文档或
+daemon 传输。
 
 ## 语法边界
 

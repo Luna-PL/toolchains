@@ -34,9 +34,11 @@ exports, types, ownership, selectors, and diagnostics.
 probing `--version` and `luna.diagnostic` JSONL identity, then independently
 probing optional `luna.analysis` identity and capabilities. The first
 language server consumes this API and must not parse human-rendered stderr as a
-stable API. Saved-file diagnostics are the first supported mode. Unsaved
-buffers wait for a compiler overlay or daemon protocol instead of being copied
-into a fake package layout.
+stable API. Saved-file diagnostics remain separate. Compilers advertising
+`single-document-overlay` accept the current document through stdin while
+loading the rest of its package normally; no temporary package layout is
+created. A future multi-document or daemon transport is required before one
+snapshot can combine several dirty files.
 
 ## Syntax boundary
 

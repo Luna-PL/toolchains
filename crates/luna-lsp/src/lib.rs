@@ -2,7 +2,9 @@
 
 mod syntax;
 
-use luna_compiler::{Compiler, DiscoveryConfig, analyze_saved, check_saved, discover};
+use luna_compiler::{
+    Compiler, DiscoveryConfig, analyze_overlay, analyze_saved, check_saved, discover,
+};
 use luna_protocol::{AnalysisRecord, Record, Span, SymbolKind};
 use luna_workspace::compiler_check_target;
 use serde_json::{Value, json};
@@ -22,6 +24,12 @@ struct Document {
     dirty: bool,
 }
 
+struct AnalysisCache {
+    records: Vec<AnalysisRecord>,
+    overlay_path: Option<PathBuf>,
+    overlay_version: Option<i64>,
+}
+
 struct Server {
     initialized: bool,
     shutdown_requested: bool,
@@ -30,7 +38,7 @@ struct Server {
     documents: HashMap<String, Document>,
     pending_checks: HashMap<String, Instant>,
     published_by_target: HashMap<PathBuf, HashSet<String>>,
-    analysis_by_target: HashMap<PathBuf, Vec<AnalysisRecord>>,
+    analysis_by_target: HashMap<PathBuf, AnalysisCache>,
 }
 
 impl Server {
@@ -68,7 +76,15 @@ impl Server {
                     .identity
                     .analysis_capabilities
                     .iter()
-                    .any(|capability| capability == "call-references")
+                    .any(|capability| {
+                        matches!(
+                            capability.as_str(),
+                            "call-references"
+                                | "method-references"
+                                | "type-references"
+                                | "trait-references"
+                        )
+                    })
             });
             return respond(
                 output,
@@ -218,9 +234,7 @@ impl Server {
                 dirty: !matches_disk,
             },
         );
-        if matches_disk {
-            self.schedule(uri);
-        }
+        self.schedule(uri);
     }
 
     fn did_change(&mut self, parameters: &Value) -> Result<(), String> {
@@ -247,7 +261,7 @@ impl Server {
         open.dirty = true;
         let target = compiler_check_target(&open.path);
         self.analysis_by_target.remove(&target);
-        self.pending_checks.remove(uri);
+        self.schedule(uri);
         Ok(())
     }
 
@@ -274,7 +288,16 @@ impl Server {
         else {
             return Ok(());
         };
-        self.documents.remove(uri);
+        if let Some(document) = self.documents.remove(uri) {
+            let target = compiler_check_target(&document.path);
+            if self
+                .analysis_by_target
+                .get(&target)
+                .is_some_and(|cache| cache.overlay_path.as_deref() == Some(document.path.as_path()))
+            {
+                self.analysis_by_target.remove(&target);
+            }
+        }
         self.pending_checks.remove(uri);
         publish_diagnostics(output, uri, Vec::new(), None)
     }
@@ -315,10 +338,6 @@ impl Server {
             notify_log(output, 1, &format!("cannot read saved Luna source {uri}"))?;
             return Ok(());
         };
-        if document.dirty || saved != document.text {
-            notify_log(output, 3, &format!("skipping unsaved Luna document {uri}"))?;
-            return Ok(());
-        }
         let Some(compiler) = self.compiler.clone() else {
             notify_log(
                 output,
@@ -330,6 +349,42 @@ impl Server {
             return Ok(());
         };
         let target = compiler_check_target(&document.path);
+        if document.dirty || saved != document.text {
+            if compiler
+                .identity
+                .analysis_capabilities
+                .iter()
+                .any(|capability| capability == "single-document-overlay")
+            {
+                match analyze_overlay(&compiler, &target, &document.path, &document.text) {
+                    Ok(analysis)
+                        if matches!(
+                            analysis.records.last(),
+                            Some(AnalysisRecord::Summary { complete: true, .. })
+                        ) =>
+                    {
+                        self.analysis_by_target.insert(
+                            target,
+                            AnalysisCache {
+                                records: analysis.records,
+                                overlay_path: Some(document.path),
+                                overlay_version: Some(document.version),
+                            },
+                        );
+                    }
+                    Ok(_) => {
+                        self.analysis_by_target.remove(&target);
+                    }
+                    Err(error) => {
+                        self.analysis_by_target.remove(&target);
+                        notify_log(output, 2, &format!("Luna overlay analysis failed: {error}"))?;
+                    }
+                }
+            } else {
+                notify_log(output, 3, &format!("skipping unsaved Luna document {uri}"))?;
+            }
+            return Ok(());
+        }
         let report = match check_saved(&compiler, &target) {
             Ok(report) => report,
             Err(error) => {
@@ -346,8 +401,14 @@ impl Server {
                         Some(AnalysisRecord::Summary { complete: true, .. })
                     ) =>
                 {
-                    self.analysis_by_target
-                        .insert(target.clone(), analysis.records);
+                    self.analysis_by_target.insert(
+                        target.clone(),
+                        AnalysisCache {
+                            records: analysis.records,
+                            overlay_path: None,
+                            overlay_version: None,
+                        },
+                    );
                 }
                 Ok(_) => {
                     self.analysis_by_target.remove(&target);
@@ -427,11 +488,8 @@ impl Server {
         let Some(document) = self.documents.get(uri) else {
             return Value::Array(Vec::new());
         };
-        if !document.dirty {
-            let target = compiler_check_target(&document.path);
-            if let Some(records) = self.analysis_by_target.get(&target) {
-                return Value::Array(analysis_document_symbols(records, &document.path));
-            }
+        if let Some(records) = self.analysis_records_for(document) {
+            return Value::Array(analysis_document_symbols(records, document));
         }
         Value::Array(syntax::document_symbols(&document.text))
     }
@@ -452,22 +510,35 @@ impl Server {
         let Some(document) = self.documents.get(uri) else {
             return Value::Null;
         };
-        if document.dirty {
-            return Value::Null;
-        }
         let Some(position) = parameters.get("position") else {
             return Value::Null;
         };
         let Ok(byte) = syntax::lsp_position_to_byte(&document.text, position) else {
             return Value::Null;
         };
-        let target = compiler_check_target(&document.path);
-        self.analysis_by_target
-            .get(&target)
+        self.analysis_records_for(document)
             .and_then(|records| {
                 definition_from_analysis(records, &document.path, byte, &self.documents)
             })
             .unwrap_or(Value::Null)
+    }
+
+    fn analysis_records_for(&self, document: &Document) -> Option<&[AnalysisRecord]> {
+        let target = compiler_check_target(&document.path);
+        let cache = self.analysis_by_target.get(&target)?;
+        if document.dirty {
+            let expected =
+                std::fs::canonicalize(&document.path).unwrap_or_else(|_| document.path.clone());
+            let actual = cache
+                .overlay_path
+                .as_ref()
+                .map(|path| std::fs::canonicalize(path).unwrap_or_else(|_| path.clone()));
+            if actual.as_ref() != Some(&expected) || cache.overlay_version != Some(document.version)
+            {
+                return None;
+            }
+        }
+        Some(&cache.records)
     }
 
     fn document_text(&self, parameters: &Value) -> Option<&str> {
@@ -480,8 +551,8 @@ impl Server {
     }
 }
 
-fn analysis_document_symbols(records: &[AnalysisRecord], path: &Path) -> Vec<Value> {
-    let expected = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+fn analysis_document_symbols(records: &[AnalysisRecord], document: &Document) -> Vec<Value> {
+    let expected = std::fs::canonicalize(&document.path).unwrap_or_else(|_| document.path.clone());
     records
         .iter()
         .filter_map(|record| {
@@ -501,7 +572,7 @@ fn analysis_document_symbols(records: &[AnalysisRecord], path: &Path) -> Vec<Val
             if actual != expected {
                 return None;
             }
-            let range = lsp_range(selection);
+            let range = lsp_range_with_source(selection, &document.text);
             Some(json!({
                 "name": name,
                 "detail": signature,
@@ -542,7 +613,7 @@ fn definition_from_analysis(
         (id == target_id).then(|| {
             json!({
                 "uri": uri_for_path(&selection.path, documents),
-                "range": lsp_range(selection)
+                "range": lsp_range_for_documents(selection, documents)
             })
         })
     })
@@ -716,9 +787,23 @@ fn publish_diagnostics(
 
 fn lsp_range(span: &Span) -> Value {
     let source = std::fs::read_to_string(&span.path).unwrap_or_default();
+    lsp_range_with_source(span, &source)
+}
+
+fn lsp_range_for_documents(span: &Span, documents: &HashMap<String, Document>) -> Value {
+    let expected = std::fs::canonicalize(&span.path).unwrap_or_else(|_| PathBuf::from(&span.path));
+    if let Some(document) = documents.values().find(|document| {
+        std::fs::canonicalize(&document.path).unwrap_or_else(|_| document.path.clone()) == expected
+    }) {
+        return lsp_range_with_source(span, &document.text);
+    }
+    lsp_range(span)
+}
+
+fn lsp_range_with_source(span: &Span, source: &str) -> Value {
     json!({
-        "start": byte_to_position(&source, span.start.byte as usize, span.start.line, span.start.column),
-        "end": byte_to_position(&source, span.end.byte as usize, span.end.line, span.end.column)
+        "start": byte_to_position(source, span.start.byte as usize, span.start.line, span.start.column),
+        "end": byte_to_position(source, span.end.byte as usize, span.end.line, span.end.column)
     })
 }
 
@@ -869,7 +954,13 @@ mod tests {
             "../../../tests/protocol/analysis_v1.jsonl"
         ))
         .expect("analysis golden stream must parse");
-        let symbols = analysis_document_symbols(&records, Path::new("/workspace/main.luna"));
+        let document = Document {
+            path: PathBuf::from("/workspace/main.luna"),
+            text: "fn add".to_owned(),
+            version: 1,
+            dirty: false,
+        };
+        let symbols = analysis_document_symbols(&records, &document);
         assert_eq!(symbols.len(), 1);
         assert_eq!(symbols[0]["name"], "add");
         assert_eq!(symbols[0]["kind"], 12);

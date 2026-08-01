@@ -1,6 +1,18 @@
 fn answer() -> i32 {
     return 42;
 }
+nominal struct Box {
+    value: i32;
+}
+fn keep(affine value: Box) -> affine Box {
+    return value;
+}
+trait Transform {
+    fn transform(value: i32) -> i32;
+}
+impl Transform for i32 {
+    fn transform(value: i32) -> i32 { return value + 1; }
+}
 fn main() -> i32 {
-    return answer();
+    return answer().transform();
 }

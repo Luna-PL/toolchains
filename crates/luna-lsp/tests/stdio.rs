@@ -213,6 +213,8 @@ fn optional_real_compiler_definition_follows_resolved_symbol_id() {
     let fixture =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/definition.luna");
     let source = std::fs::read_to_string(&fixture).expect("fixture must be readable");
+    let dirty_source_v2 = format!("// first unsaved edit\n{source}");
+    let dirty_source_v3 = format!("// first unsaved edit\n// 月 second edit\n{source}");
     let uri = file_uri(&fixture);
 
     for message in [
@@ -227,7 +229,7 @@ fn optional_real_compiler_definition_follows_resolved_symbol_id() {
             "jsonrpc": "2.0",
             "method": "textDocument/didOpen",
             "params": {"textDocument": {
-                "uri": uri, "languageId": "luna", "version": 1, "text": source
+                "uri": uri, "languageId": "luna", "version": 1, "text": source.clone()
             }}
         }),
     ] {
@@ -244,10 +246,79 @@ fn optional_real_compiler_definition_follows_resolved_symbol_id() {
             "method": "textDocument/definition",
             "params": {
                 "textDocument": {"uri": uri},
-                "position": {"line": 4, "character": 12}
+                "position": {"line": 16, "character": 12}
             }
         }),
-        json!({"jsonrpc": "2.0", "id": 3, "method": "shutdown", "params": null}),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "textDocument/definition",
+            "params": {
+                "textDocument": {"uri": uri},
+                "position": {"line": 16, "character": 21}
+            }
+        }),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "textDocument/definition",
+            "params": {
+                "textDocument": {"uri": uri},
+                "position": {"line": 6, "character": 23}
+            }
+        }),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "textDocument/definition",
+            "params": {
+                "textDocument": {"uri": uri},
+                "position": {"line": 12, "character": 7}
+            }
+        }),
+        json!({
+            "jsonrpc": "2.0",
+            "method": "textDocument/didChange",
+            "params": {
+                "textDocument": {"uri": uri, "version": 2},
+                "contentChanges": [{"text": dirty_source_v2}]
+            }
+        }),
+        json!({
+            "jsonrpc": "2.0",
+            "method": "textDocument/didChange",
+            "params": {
+                "textDocument": {"uri": uri, "version": 3},
+                "contentChanges": [{"text": dirty_source_v3}]
+            }
+        }),
+    ] {
+        input
+            .write_all(&frame(&message))
+            .expect("request must be writable");
+    }
+    input.flush().expect("dirty requests must flush");
+    thread::sleep(Duration::from_millis(350));
+    for message in [
+        json!({
+            "jsonrpc": "2.0",
+            "id": 6,
+            "method": "textDocument/definition",
+            "params": {
+                "textDocument": {"uri": uri},
+                "position": {"line": 18, "character": 21}
+            }
+        }),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "textDocument/definition",
+            "params": {
+                "textDocument": {"uri": uri},
+                "position": {"line": 8, "character": 23}
+            }
+        }),
+        json!({"jsonrpc": "2.0", "id": 8, "method": "shutdown", "params": null}),
         json!({"jsonrpc": "2.0", "method": "exit", "params": null}),
     ] {
         input
@@ -271,5 +342,30 @@ fn optional_real_compiler_definition_follows_resolved_symbol_id() {
         message.get("id") == Some(&json!(2))
             && message.pointer("/result/range/start/line") == Some(&json!(0))
             && message.pointer("/result/range/start/character") == Some(&json!(3))
+    }));
+    assert!(messages.iter().any(|message| {
+        message.get("id") == Some(&json!(3))
+            && message.pointer("/result/range/start/line") == Some(&json!(13))
+            && message.pointer("/result/range/start/character") == Some(&json!(7))
+    }));
+    assert!(messages.iter().any(|message| {
+        message.get("id") == Some(&json!(4))
+            && message.pointer("/result/range/start/line") == Some(&json!(3))
+            && message.pointer("/result/range/start/character") == Some(&json!(15))
+    }));
+    assert!(messages.iter().any(|message| {
+        message.get("id") == Some(&json!(5))
+            && message.pointer("/result/range/start/line") == Some(&json!(9))
+            && message.pointer("/result/range/start/character") == Some(&json!(6))
+    }));
+    assert!(messages.iter().any(|message| {
+        message.get("id") == Some(&json!(6))
+            && message.pointer("/result/range/start/line") == Some(&json!(15))
+            && message.pointer("/result/range/start/character") == Some(&json!(7))
+    }));
+    assert!(messages.iter().any(|message| {
+        message.get("id") == Some(&json!(7))
+            && message.pointer("/result/range/start/line") == Some(&json!(5))
+            && message.pointer("/result/range/start/character") == Some(&json!(15))
     }));
 }

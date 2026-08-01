@@ -45,8 +45,8 @@ editor-host 证据。
 ## M4：语义编辑能力
 
 状态：进行中；声明协议 v1 的 wire type、校验、编译器生产端及客户端已经实现，LSP
-已接入保存文件 document symbol 和直接调用 definition；更多引用类别和文档 overlay
-仍待完成。
+已接入保存文件 document symbol、直接函数、trait method、类型语法与 trait definition，
+以及单文档脏 buffer overlay；构造器/字段引用和多文档 overlay 仍待完成。
 
 - 编译器拥有的分析协议和文档 overlay。
 - 依次实现 hover、definition、completion、reference 和 rename。

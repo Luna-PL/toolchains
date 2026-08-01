@@ -59,8 +59,12 @@ fix 是带 applicability（`machine-applicable`、`maybe-incorrect` 或 `manual`
 
 `luna.analysis` v1 是换行分隔的语义快照。一次调用严格输出一条 `hello`、零条或多条
 `symbol`/`reference`，以及严格一条 `summary`。`declarations` capability 传递由编译器
-拥有的符号身份和类型；`call-references` 增加已解析的直接调用目标，但不宣称覆盖全部
-引用类别或未保存文档 overlay。
+拥有的符号身份和类型；`call-references` 增加已解析的直接调用目标。
+`method-references` 增加已解析的用户 trait method 调用目标。
+`type-references` 增加类型语法中的用户 struct、enum 和 metadata schema 名称；
+`trait-references` 增加 impl 与 bound 中已解析的 trait 名称。
+`single-document-overlay` 通过 `--overlay` 接收一个真实源码路径，从 stdin 读取替换的
+UTF-8 文本，同时正常解析所选 package。
 
 ```json
 {
@@ -92,10 +96,13 @@ summary 给出 symbol/reference 记录数和 `complete`。解析恢复或语义�
 
 `reference` 包含源码 span 和不透明 `target_id`，该 ID 必须指向同一快照中的 symbol。
 客户端只能为 capability 明确声明的引用类别实现 definition；v1 的
-`call-references` 当前只保证直接函数调用。
+`call-references` 保证直接函数调用，`method-references` 保证已解析的用户
+trait method 调用；`type-references` 覆盖类型语法中已解析的用户类型名，
+`trait-references` 覆盖 impl 和 bound 中的 trait 名。
 
 Rust wire type 和序列校验已经在 `luna-protocol` 中实现；配套编译器生产端及按
-capability 开关的 `luna-compiler` 客户端也已实现。完整保存文件快照具备
-`call-references` 时已经启用 definition。hover、workspace
+capability 开关的 `luna-compiler` 客户端也已实现。完整保存文件快照具备任一已广告的
+reference capability 时已经启用 definition，版本匹配的完整 overlay 快照具有相同语义。
+hover、workspace
 reference、completion 和 rename 必须使用后续显式 capability，不能从 MoonIR 名字或
 渲染诊断中推断。

@@ -8,8 +8,8 @@
 
 单元测试必须能在没有编译器 checkout 和网络访问的情况下运行。设置 `LUNA_BIN` 后，
 workspace 测试还会让 `luna-compiler` 探测真实编译器。`luna-lsp` 的 stdio 集成测试
-覆盖生命周期、symbol、folding，并在设置 `LUNA_BIN` 时覆盖真实编译器诊断和直接
-调用 definition。
+覆盖生命周期、symbol、folding，并在设置 `LUNA_BIN` 时覆盖真实编译器诊断，直接函数、
+trait method、类型和 trait definition，以及带 Unicode 和版本匹配的脏 buffer overlay definition。
 
 `luna-fmt` 测试覆盖注释保留、幂等性、`--check`、`--write`、stdin、malformed 输入
 不变性和可选编译器源码 corpus。同时设置 `LUNA_SOURCE_DIR` 与 `LUNA_BIN` 时，真实
