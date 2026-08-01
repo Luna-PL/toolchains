@@ -3,7 +3,7 @@
 [English](language_server.md) | [简体中文](language_server.zh-CN.md)
 
 > 状态：LunaToolchain 0.1 中已实现，当前为实验性
-> 语义权威：Luna 编译器 `luna.diagnostic` version 1
+> 语义权威：Luna 编译器 `luna.diagnostic` 与 `luna.analysis` version 1
 
 ## 生命周期与同步
 
@@ -24,10 +24,15 @@ server 在初始化期间发现兼容编译器，并对最近的 package、works
 
 ## 结构化编辑能力
 
-当前提供 `textDocument/documentSymbol` 和 `textDocument/foldingRange`。它们只是词法
-结构辅助，不是语义分析：symbol 识别声明头，folding 跟踪注释和字符串之外的配对
-大括号。hover、completion、definition、reference 和 rename 必须等待编译器实现
-`luna.analysis`，目前保持禁用。
+当前提供 `textDocument/documentSymbol` 和 `textDocument/foldingRange`。保存文件成功
+分析后，document symbol 使用编译器拥有的声明 ID、kind、签名
+和 selection span。脏文档或不支持 `luna.analysis` 的编译器继续使用词法声明 fallback。
+folding 仍跟踪注释和字符串之外的配对大括号。
+
+仅当编译器报告 `call-references` capability 时才声明 `textDocument/definition`。它在
+完整的保存文件快照中通过不透明 Symbol ID 解析直接函数调用；overlay 实现前，脏文档
+不返回 definition。hover、completion、workspace reference 和 rename 仍需编译器协议
+提供各自所需的更多语义记录，目前保持禁用。
 
 ## VS Code 配置
 

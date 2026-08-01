@@ -7,7 +7,7 @@ use std::fmt;
 pub const DIAGNOSTIC_PROTOCOL: &str = "luna.diagnostic";
 pub const DIAGNOSTIC_PROTOCOL_VERSION: u32 = 1;
 pub const ANALYSIS_PROTOCOL: &str = "luna.analysis";
-pub const ANALYSIS_PROTOCOL_VERSION: u32 = 0;
+pub const ANALYSIS_PROTOCOL_VERSION: u32 = 1;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ProtocolVersion {
@@ -18,6 +18,11 @@ pub struct ProtocolVersion {
 pub const DIAGNOSTICS_V1: ProtocolVersion = ProtocolVersion {
     name: DIAGNOSTIC_PROTOCOL,
     version: DIAGNOSTIC_PROTOCOL_VERSION,
+};
+
+pub const ANALYSIS_V1: ProtocolVersion = ProtocolVersion {
+    name: ANALYSIS_PROTOCOL,
+    version: ANALYSIS_PROTOCOL_VERSION,
 };
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -93,6 +98,81 @@ pub enum Record {
     },
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SymbolKind {
+    Function,
+    Kernel,
+    Method,
+    Fragment,
+    Struct,
+    Enum,
+    Trait,
+    Metadata,
+    Constraint,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum AnalysisRecord {
+    Hello {
+        protocol: String,
+        version: u32,
+        language_version: String,
+        compiler_commit: String,
+        build_target: String,
+        capabilities: Vec<String>,
+    },
+    Symbol {
+        protocol: String,
+        version: u32,
+        id: String,
+        name: String,
+        qualified_name: String,
+        package_id: String,
+        module_path: String,
+        linkage_name: String,
+        symbol_kind: SymbolKind,
+        signature: String,
+        selection: Span,
+        exported: bool,
+        external: bool,
+    },
+    Reference {
+        protocol: String,
+        version: u32,
+        target_id: String,
+        source: Span,
+    },
+    Summary {
+        protocol: String,
+        version: u32,
+        symbols: u32,
+        references: u32,
+        complete: bool,
+    },
+}
+
+impl AnalysisRecord {
+    pub fn protocol(&self) -> &str {
+        match self {
+            Self::Hello { protocol, .. }
+            | Self::Symbol { protocol, .. }
+            | Self::Reference { protocol, .. }
+            | Self::Summary { protocol, .. } => protocol,
+        }
+    }
+
+    pub fn version(&self) -> u32 {
+        match self {
+            Self::Hello { version, .. }
+            | Self::Symbol { version, .. }
+            | Self::Reference { version, .. }
+            | Self::Summary { version, .. } => *version,
+        }
+    }
+}
+
 impl Record {
     pub fn protocol(&self) -> &str {
         match self {
@@ -121,7 +201,7 @@ impl fmt::Display for JsonLineError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
-            "invalid diagnostic JSON on line {}: {}",
+            "invalid protocol JSON on line {}: {}",
             self.line, self.source
         )
     }
@@ -134,6 +214,19 @@ impl Error for JsonLineError {
 }
 
 pub fn parse_jsonl(input: &str) -> Result<Vec<Record>, JsonLineError> {
+    input
+        .lines()
+        .enumerate()
+        .map(|(index, line)| {
+            serde_json::from_str(line).map_err(|source| JsonLineError {
+                line: index + 1,
+                source,
+            })
+        })
+        .collect()
+}
+
+pub fn parse_analysis_jsonl(input: &str) -> Result<Vec<AnalysisRecord>, JsonLineError> {
     input
         .lines()
         .enumerate()
@@ -160,6 +253,14 @@ pub enum SequenceError {
     },
     MissingSummary,
     InconsistentSummary,
+    DuplicateSymbolId {
+        index: usize,
+        id: String,
+    },
+    UnknownReferenceTarget {
+        index: usize,
+        target_id: String,
+    },
 }
 
 impl fmt::Display for SequenceError {
@@ -181,8 +282,16 @@ impl fmt::Display for SequenceError {
             }
             Self::MissingSummary => write!(formatter, "last record is not summary"),
             Self::InconsistentSummary => {
-                write!(formatter, "summary counts do not match diagnostic records")
+                write!(formatter, "summary counts do not match stream records")
             }
+            Self::DuplicateSymbolId { index, id } => {
+                write!(formatter, "record {} repeats symbol id {id}", index + 1)
+            }
+            Self::UnknownReferenceTarget { index, target_id } => write!(
+                formatter,
+                "record {} references unknown symbol id {target_id}",
+                index + 1
+            ),
         }
     }
 }
@@ -243,17 +352,83 @@ pub fn validate_sequence(records: &[Record]) -> Result<(), SequenceError> {
     Ok(())
 }
 
+pub fn validate_analysis_sequence(records: &[AnalysisRecord]) -> Result<(), SequenceError> {
+    use std::collections::HashSet;
+
+    if records.is_empty() {
+        return Err(SequenceError::Empty);
+    }
+    for (index, record) in records.iter().enumerate() {
+        if record.protocol() != ANALYSIS_PROTOCOL || record.version() != ANALYSIS_PROTOCOL_VERSION {
+            return Err(SequenceError::UnsupportedIdentity {
+                index,
+                protocol: record.protocol().to_owned(),
+                version: record.version(),
+            });
+        }
+    }
+    if !matches!(records.first(), Some(AnalysisRecord::Hello { .. })) {
+        return Err(SequenceError::MissingHello);
+    }
+    if !matches!(records.last(), Some(AnalysisRecord::Summary { .. })) {
+        return Err(SequenceError::MissingSummary);
+    }
+
+    let mut ids = HashSet::new();
+    let mut references = Vec::new();
+    for (offset, record) in records[1..records.len() - 1].iter().enumerate() {
+        let index = offset + 1;
+        match record {
+            AnalysisRecord::Symbol { id, .. } => {
+                if !ids.insert(id) {
+                    return Err(SequenceError::DuplicateSymbolId {
+                        index,
+                        id: id.clone(),
+                    });
+                }
+            }
+            AnalysisRecord::Reference { target_id, .. } => {
+                references.push((index, target_id));
+            }
+            _ => return Err(SequenceError::UnexpectedRecord { index }),
+        }
+    }
+    for (index, target_id) in &references {
+        if !ids.contains(target_id) {
+            return Err(SequenceError::UnknownReferenceTarget {
+                index: *index,
+                target_id: (*target_id).clone(),
+            });
+        }
+    }
+
+    let AnalysisRecord::Summary {
+        symbols,
+        references: summary_references,
+        ..
+    } = records.last().expect("non-empty sequence checked above")
+    else {
+        unreachable!("summary shape checked above");
+    };
+    if *symbols != ids.len() as u32 || *summary_references != references.len() as u32 {
+        return Err(SequenceError::InconsistentSummary);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     const GOLDEN: &str = include_str!("../../../tests/protocol/diagnostics_v1.jsonl");
+    const ANALYSIS_GOLDEN: &str = include_str!("../../../tests/protocol/analysis_v1.jsonl");
 
     #[test]
     fn diagnostic_protocol_starts_at_v1() {
         assert_eq!(DIAGNOSTICS_V1.name, "luna.diagnostic");
         assert_eq!(DIAGNOSTICS_V1.version, 1);
-        assert_eq!(ANALYSIS_PROTOCOL_VERSION, 0);
+        assert_eq!(ANALYSIS_V1.name, "luna.analysis");
+        assert_eq!(ANALYSIS_V1.version, 1);
     }
 
     #[test]
@@ -279,5 +454,57 @@ mod tests {
             validate_sequence(&records),
             Err(SequenceError::MissingSummary)
         );
+    }
+
+    #[test]
+    fn parses_and_validates_analysis_v1_golden_stream() {
+        let records = parse_analysis_jsonl(ANALYSIS_GOLDEN).expect("golden JSONL must deserialize");
+        validate_analysis_sequence(&records).expect("golden protocol sequence must validate");
+        assert_eq!(records.len(), 4);
+        assert!(matches!(
+            &records[1],
+            AnalysisRecord::Symbol {
+                id,
+                symbol_kind: SymbolKind::Function,
+                selection: Span { start, end, .. },
+                ..
+            } if id.starts_with("luna.symbol.v1") && start.byte == 3 && end.byte == 7
+        ));
+        assert!(matches!(
+            &records[2],
+            AnalysisRecord::Reference {
+                target_id,
+                source: Span { start, end, .. },
+                ..
+            } if target_id.starts_with("luna.symbol.v1") && start.byte == 58 && end.byte == 61
+        ));
+    }
+
+    #[test]
+    fn rejects_duplicate_analysis_symbol_ids() {
+        let mut records =
+            parse_analysis_jsonl(ANALYSIS_GOLDEN).expect("golden JSONL must deserialize");
+        let duplicate = records[1].clone();
+        records.insert(2, duplicate);
+        if let Some(AnalysisRecord::Summary { symbols, .. }) = records.last_mut() {
+            *symbols = 2;
+        }
+        assert!(matches!(
+            validate_analysis_sequence(&records),
+            Err(SequenceError::DuplicateSymbolId { index: 2, .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_reference_to_unknown_symbol_id() {
+        let mut records =
+            parse_analysis_jsonl(ANALYSIS_GOLDEN).expect("golden JSONL must deserialize");
+        if let AnalysisRecord::Reference { target_id, .. } = &mut records[2] {
+            *target_id = "luna.symbol.v1:7:missing".to_owned();
+        }
+        assert!(matches!(
+            validate_analysis_sequence(&records),
+            Err(SequenceError::UnknownReferenceTarget { index: 2, .. })
+        ));
     }
 }

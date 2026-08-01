@@ -29,7 +29,8 @@
 ## 进程边界
 
 `luna-compiler` 按显式配置、`PATH`、本地开发 fallback 的顺序发现候选，并且仅在
-候选同时通过 `--version` 和 `luna.diagnostic` JSONL 身份探测后才接受。首版
+候选同时通过 `--version` 和 `luna.diagnostic` JSONL 身份探测后才接受，随后独立探测
+可选的 `luna.analysis` 身份与 capability。首版
 language server 消费该 API；人类可读 stderr 不是稳定 API。首个支持模式是已保存
 文件诊断；未保存 buffer 必须等待编译器 overlay 或 daemon 协议，不能通过伪造临时
 package 布局实现。

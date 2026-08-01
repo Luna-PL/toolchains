@@ -196,3 +196,80 @@ fn stdio_lifecycle_symbols_folding_and_optional_diagnostics() {
         }));
     }
 }
+
+#[test]
+fn optional_real_compiler_definition_follows_resolved_symbol_id() {
+    let Some(luna_bin) = std::env::var_os("LUNA_BIN") else {
+        return;
+    };
+    let mut child = Command::new(env!("CARGO_BIN_EXE_luna-lsp"))
+        .env("LUNA_BIN", &luna_bin)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("language server must start");
+    let mut input = child.stdin.take().expect("stdin must be piped");
+    let fixture =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/definition.luna");
+    let source = std::fs::read_to_string(&fixture).expect("fixture must be readable");
+    let uri = file_uri(&fixture);
+
+    for message in [
+        json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {"initializationOptions": {"lunaPath": luna_bin.to_string_lossy()}}
+        }),
+        json!({"jsonrpc": "2.0", "method": "initialized", "params": {}}),
+        json!({
+            "jsonrpc": "2.0",
+            "method": "textDocument/didOpen",
+            "params": {"textDocument": {
+                "uri": uri, "languageId": "luna", "version": 1, "text": source
+            }}
+        }),
+    ] {
+        input
+            .write_all(&frame(&message))
+            .expect("request must be writable");
+    }
+    input.flush().expect("requests must flush");
+    thread::sleep(Duration::from_millis(350));
+    for message in [
+        json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "textDocument/definition",
+            "params": {
+                "textDocument": {"uri": uri},
+                "position": {"line": 4, "character": 12}
+            }
+        }),
+        json!({"jsonrpc": "2.0", "id": 3, "method": "shutdown", "params": null}),
+        json!({"jsonrpc": "2.0", "method": "exit", "params": null}),
+    ] {
+        input
+            .write_all(&frame(&message))
+            .expect("request must be writable");
+    }
+    drop(input);
+
+    let output = child.wait_with_output().expect("language server must exit");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let messages = parse_frames(output.stdout);
+    assert!(messages.iter().any(|message| {
+        message.get("id") == Some(&json!(1))
+            && message.pointer("/result/capabilities/definitionProvider") == Some(&json!(true))
+    }));
+    assert!(messages.iter().any(|message| {
+        message.get("id") == Some(&json!(2))
+            && message.pointer("/result/range/start/line") == Some(&json!(0))
+            && message.pointer("/result/range/start/character") == Some(&json!(3))
+    }));
+}

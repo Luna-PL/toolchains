@@ -31,7 +31,8 @@ exports, types, ownership, selectors, and diagnostics.
 
 `luna-compiler` discovers candidates in the order explicit configuration,
 `PATH`, then local development fallback. It accepts a candidate only after
-probing both `--version` and `luna.diagnostic` JSONL identity. The first
+probing `--version` and `luna.diagnostic` JSONL identity, then independently
+probing optional `luna.analysis` identity and capabilities. The first
 language server consumes this API and must not parse human-rendered stderr as a
 stable API. Saved-file diagnostics are the first supported mode. Unsaved
 buffers wait for a compiler overlay or daemon protocol instead of being copied

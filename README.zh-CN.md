@@ -5,10 +5,10 @@
 LunaToolchain 是 Luna `0.2.0-alpha` 的独立编辑器与开发者工具工作区。本地开发时
 它位于编译器目录内，但具有独立的 Git 历史、发布、兼容策略和版本号。
 
-当前状态为 M3 语法与格式化。`luna-protocol` 校验编译器 JSONL，
-`luna-compiler` 发现兼容编译器并执行检查，`luna-lsp` 通过 stdio 提供已保存文件
-诊断、document symbol 和 folding。生成的 Tree-sitter grammar 与 `luna-fmt` 提供
-无损、保留注释的全文格式化；语义导航仍在规划中。
+当前状态为 M4 语义工具进行中。`luna-protocol` 校验诊断和分析 JSONL，
+`luna-compiler` 按 capability 探测兼容编译器，`luna-lsp` 通过 stdio 提供已保存文件
+诊断、编译器驱动的 document symbol、直接调用 definition 和 folding。生成的
+Tree-sitter grammar 与 `luna-fmt` 提供无损、保留注释的全文格式化。
 
 ## 仓库边界
 
@@ -32,7 +32,8 @@ cargo run --offline -p luna-tools -- compiler --luna /path/to/luna
 ```
 
 编译器发现依次检查显式 `--luna`/`LUNA_BIN`、`PATH`，最后在本地开发候选
-`../build/luna` 存在时检查它。任何候选都必须同时通过 `--version` 和诊断协议探测。
+`../build/luna` 存在时检查它。任何候选都必须同时通过 `--version` 和诊断协议探测，
+随后独立探测可选的 analysis capability。
 
 ## 持续集成
 

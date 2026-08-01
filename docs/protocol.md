@@ -2,8 +2,8 @@
 
 [English](protocol.md) | [简体中文](protocol.zh-CN.md)
 
-> Status: implemented experimental in the companion Luna compiler worktree
-> Protocol: `luna.diagnostic` version 1
+> Status: diagnostic producer implemented; analysis v1 consumer contract implemented
+> Protocols: `luna.diagnostic` version 1, `luna.analysis` version 1
 
 ## Transport
 
@@ -65,8 +65,54 @@ Fixes are structured edits with applicability (`machine-applicable`,
 `luna-protocol` owns the Serde wire types and rejects an incorrect protocol
 identity, unsupported version, invalid ordering, or inconsistent summary.
 
-## Deferred analysis protocol
+## Analysis protocol v1
 
-`luna.analysis` remains version `0` and unsupported. Hover, definition,
-references, completion, and rename must wait for compiler-owned symbol/type
-records. They must not be inferred from MoonIR names or rendered diagnostics.
+`luna.analysis` v1 is a newline-delimited semantic snapshot. One invocation
+emits exactly one `hello`, zero or more `symbol` and `reference` records, and
+exactly one `summary`. The `declarations` capability carries compiler-owned
+symbol identity and types. `call-references` adds resolved direct-call targets;
+it does not claim support for every reference class or an unsaved-document
+overlay.
+
+```json
+{
+  "protocol": "luna.analysis",
+  "version": 1,
+  "kind": "symbol",
+  "id": "luna.symbol.v1:4:main:0::8:function:9:main::add",
+  "name": "add",
+  "qualified_name": "main::add",
+  "package_id": "main",
+  "module_path": "",
+  "linkage_name": "main::add",
+  "symbol_kind": "function",
+  "signature": "fn add(left: i32, right: i32) -> i32",
+  "selection": {
+    "path": "/workspace/main.luna",
+    "start": { "byte": 3, "line": 1, "column": 4 },
+    "end": { "byte": 7, "line": 1, "column": 8 }
+  },
+  "exported": true,
+  "external": false
+}
+```
+
+Symbol IDs are opaque, stable identities; clients compare and store them but
+must not parse their current length-delimited representation. `selection` uses
+the same UTF-8 byte and one-based display-position rules as diagnostic spans.
+The summary reports the numbers of symbol and reference records plus
+`complete`. A compiler may emit a useful partial declaration snapshot with
+`complete: false` after parser recovery or semantic failure.
+
+A `reference` contains a source span and an opaque `target_id` that must name a
+symbol in the same snapshot. Clients may implement definition only for the
+reference classes explicitly named by capabilities; v1 currently guarantees
+direct function calls through `call-references`.
+
+The Rust wire types and sequence validator are implemented in
+`luna-protocol`. The companion compiler producer and capability-gated
+`luna-compiler` client are implemented. Definition is enabled for complete
+saved-file snapshots with
+`call-references`. Hover, workspace references, completion, and rename must use
+future explicit capabilities and must not be inferred from MoonIR names or
+rendered diagnostics.

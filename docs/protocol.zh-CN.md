@@ -2,8 +2,8 @@
 
 [English](protocol.md) | [简体中文](protocol.zh-CN.md)
 
-> 状态：配套 Luna 编译器工作区中已实现，当前为实验性
-> 协议：`luna.diagnostic` version 1
+> 状态：诊断生产端已实现；analysis v1 消费端契约已实现
+> 协议：`luna.diagnostic` version 1、`luna.analysis` version 1
 
 ## 传输
 
@@ -55,8 +55,47 @@ fix 是带 applicability（`machine-applicable`、`maybe-incorrect` 或 `manual`
 `luna-protocol` 负责 Serde wire type，并拒绝错误协议身份、不支持的版本、无效记录
 顺序和不一致的 summary。
 
-## 延后的分析协议
+## Analysis protocol v1
 
-`luna.analysis` 当前为 version `0`，表示尚不支持。hover、definition、reference、
-completion 和 rename 必须等待编译器拥有的符号/类型记录，不能从 MoonIR 名字或渲染
-诊断中推断。
+`luna.analysis` v1 是换行分隔的语义快照。一次调用严格输出一条 `hello`、零条或多条
+`symbol`/`reference`，以及严格一条 `summary`。`declarations` capability 传递由编译器
+拥有的符号身份和类型；`call-references` 增加已解析的直接调用目标，但不宣称覆盖全部
+引用类别或未保存文档 overlay。
+
+```json
+{
+  "protocol": "luna.analysis",
+  "version": 1,
+  "kind": "symbol",
+  "id": "luna.symbol.v1:4:main:0::8:function:9:main::add",
+  "name": "add",
+  "qualified_name": "main::add",
+  "package_id": "main",
+  "module_path": "",
+  "linkage_name": "main::add",
+  "symbol_kind": "function",
+  "signature": "fn add(left: i32, right: i32) -> i32",
+  "selection": {
+    "path": "/workspace/main.luna",
+    "start": { "byte": 3, "line": 1, "column": 4 },
+    "end": { "byte": 7, "line": 1, "column": 8 }
+  },
+  "exported": true,
+  "external": false
+}
+```
+
+Symbol ID 是不透明的稳定身份；客户端可以比较和保存它，但不能解析当前的长度分隔
+表示。`selection` 与诊断 span 使用相同的 UTF-8 byte 及从 1 开始的展示位置规则。
+summary 给出 symbol/reference 记录数和 `complete`。解析恢复或语义分析失败后，
+编译器可以输出仍有用途的部分声明快照，并设置 `complete: false`。
+
+`reference` 包含源码 span 和不透明 `target_id`，该 ID 必须指向同一快照中的 symbol。
+客户端只能为 capability 明确声明的引用类别实现 definition；v1 的
+`call-references` 当前只保证直接函数调用。
+
+Rust wire type 和序列校验已经在 `luna-protocol` 中实现；配套编译器生产端及按
+capability 开关的 `luna-compiler` 客户端也已实现。完整保存文件快照具备
+`call-references` 时已经启用 definition。hover、workspace
+reference、completion 和 rename 必须使用后续显式 capability，不能从 MoonIR 名字或
+渲染诊断中推断。

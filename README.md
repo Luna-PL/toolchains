@@ -6,11 +6,12 @@ LunaToolchain is the independent editor and developer-tooling workspace for
 Luna `0.2.0-alpha`. It lives beside the compiler during local development but
 has its own Git history, releases, compatibility policy, and version number.
 
-Current status: M3 syntax and formatting. `luna-protocol` validates compiler
-JSONL, `luna-compiler` discovers and checks with compatible compilers, and
-`luna-lsp` provides saved-file diagnostics, document symbols, and folding over
-stdio. The generated Tree-sitter grammar and `luna-fmt` provide lossless,
-comment-preserving full-document formatting. Semantic navigation remains planned.
+Current status: M4 semantic tooling in progress. `luna-protocol` validates
+diagnostic and analysis JSONL, `luna-compiler` capability-probes compatible
+compilers, and `luna-lsp` provides saved-file diagnostics, compiler-backed
+document symbols, direct-call definition, and folding over stdio. The generated
+Tree-sitter grammar and `luna-fmt` provide lossless, comment-preserving
+full-document formatting.
 
 ## Repository boundaries
 
@@ -38,7 +39,8 @@ cargo run --offline -p luna-tools -- compiler --luna /path/to/luna
 
 Compiler discovery checks an explicit `--luna`/`LUNA_BIN`, then `PATH`, then
 `../build/luna` when that local development candidate exists. Selection always
-runs both `--version` and a diagnostic-protocol probe.
+runs `--version` and a diagnostic-protocol probe, then probes optional analysis
+capabilities independently.
 
 ## Continuous integration
 

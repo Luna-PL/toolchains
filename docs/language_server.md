@@ -3,7 +3,7 @@
 [English](language_server.md) | [简体中文](language_server.zh-CN.md)
 
 > Status: implemented experimental in LunaToolchain 0.1
-> Semantic authority: Luna compiler `luna.diagnostic` version 1
+> Semantic authority: Luna compiler `luna.diagnostic` and `luna.analysis` version 1
 
 ## Supported lifecycle and synchronization
 
@@ -28,10 +28,18 @@ cleared after a successful recheck or close.
 ## Structural editor features
 
 The current server provides `textDocument/documentSymbol` and
-`textDocument/foldingRange`. These are lexical structural aids, not semantic
-analysis: symbols recognize declaration headers, while folding tracks balanced
-braces outside comments and strings. Hover, completion, definition, references,
-and rename remain disabled until `luna.analysis` is implemented by the compiler.
+`textDocument/foldingRange`. After a successful saved-file analysis,
+document symbols use compiler-owned declaration IDs, kinds, signatures, and
+selection spans. Dirty documents and compilers without `luna.analysis` retain
+the lexical declaration fallback. Folding remains a structural aid that tracks
+balanced braces outside comments and strings.
+
+`textDocument/definition` is advertised only when the compiler reports the
+`call-references` capability. It resolves direct function calls by opaque
+Symbol ID in a complete saved-file snapshot. Dirty documents return no
+definition until overlay support exists. Hover, completion, workspace
+references, and rename remain disabled until the compiler protocol exposes the
+additional semantic records each operation requires.
 
 ## VS Code configuration
 

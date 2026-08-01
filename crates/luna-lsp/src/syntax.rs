@@ -175,7 +175,7 @@ pub fn apply_content_changes(source: &mut String, changes: &[Value]) -> Result<(
     Ok(())
 }
 
-fn lsp_position_to_byte(source: &str, position: &Value) -> Result<usize, String> {
+pub(crate) fn lsp_position_to_byte(source: &str, position: &Value) -> Result<usize, String> {
     let target_line = position
         .get("line")
         .and_then(Value::as_u64)

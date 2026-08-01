@@ -47,6 +47,10 @@ Exit: formatting twice is byte-identical to formatting once.
 
 ## M4: semantic editor features
 
+Status: in progress; declaration protocol v1 types, validation, compiler
+producer, client, saved-file document symbols, and direct-call definition are
+implemented. Additional reference classes and document overlays remain pending.
+
 - Compiler-owned analysis protocol and document overlays.
 - Hover, definition, completion, references, and rename in that order.
 - Feature gates follow protocol capabilities, not guessed compiler versions.

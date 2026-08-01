@@ -1,6 +1,9 @@
 //! Discovery and compatibility probing for the external Luna compiler.
 
-use luna_protocol::{DIAGNOSTIC_PROTOCOL_VERSION, Record, parse_jsonl, validate_sequence};
+use luna_protocol::{
+    ANALYSIS_PROTOCOL_VERSION, AnalysisRecord, DIAGNOSTIC_PROTOCOL_VERSION, Record,
+    parse_analysis_jsonl, parse_jsonl, validate_analysis_sequence, validate_sequence,
+};
 use std::env;
 use std::error::Error;
 use std::ffi::OsString;
@@ -22,6 +25,8 @@ pub struct CompilerIdentity {
     pub build_target: String,
     pub diagnostic_protocol_version: u32,
     pub capabilities: Vec<String>,
+    pub analysis_protocol_version: Option<u32>,
+    pub analysis_capabilities: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -34,6 +39,59 @@ pub struct Compiler {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DiagnosticReport {
     pub records: Vec<Record>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AnalysisReport {
+    pub records: Vec<AnalysisRecord>,
+}
+
+#[derive(Debug)]
+pub enum AnalysisError {
+    Unsupported,
+    Spawn(std::io::Error),
+    Failed {
+        status: Option<i32>,
+        stdout: String,
+        stderr: String,
+    },
+    NonUtf8,
+    InvalidJson(String),
+    InvalidSequence(String),
+    CompilerChanged,
+}
+
+impl fmt::Display for AnalysisError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unsupported => write!(formatter, "compiler does not support luna.analysis v1"),
+            Self::Spawn(source) => write!(formatter, "cannot run compiler analysis: {source}"),
+            Self::Failed {
+                status,
+                stdout,
+                stderr,
+            } => write!(
+                formatter,
+                "compiler analysis failed with status {status:?}; stdout={stdout:?}; stderr={stderr:?}"
+            ),
+            Self::NonUtf8 => write!(formatter, "compiler analysis output is not UTF-8"),
+            Self::InvalidJson(error) => write!(formatter, "invalid analysis JSONL: {error}"),
+            Self::InvalidSequence(error) => write!(formatter, "invalid analysis sequence: {error}"),
+            Self::CompilerChanged => write!(
+                formatter,
+                "compiler identity changed after discovery; rediscovery is required"
+            ),
+        }
+    }
+}
+
+impl Error for AnalysisError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Spawn(source) => Some(source),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -312,7 +370,7 @@ pub fn probe(path: &Path, source: CandidateSource) -> Result<Compiler, ProbeErro
     ));
     let protocol = Command::new(path)
         .arg("check")
-        .arg(missing_source)
+        .arg(&missing_source)
         .arg("--message-format=json")
         .output()
         .map_err(|source| ProbeError::Spawn {
@@ -336,7 +394,51 @@ pub fn probe(path: &Path, source: CandidateSource) -> Result<Compiler, ProbeErro
             stderr: protocol_stderr,
         });
     }
-    identity_from_outputs(path, source, &language_version, &protocol_stdout)
+    let mut compiler = identity_from_outputs(path, source, &language_version, &protocol_stdout)?;
+    if let Some(capabilities) = probe_analysis(path, &missing_source, &compiler.identity) {
+        compiler.identity.analysis_protocol_version = Some(ANALYSIS_PROTOCOL_VERSION);
+        compiler.identity.analysis_capabilities = capabilities;
+    }
+    Ok(compiler)
+}
+
+fn probe_analysis(
+    path: &Path,
+    missing_source: &Path,
+    expected: &CompilerIdentity,
+) -> Option<Vec<String>> {
+    let output = Command::new(path)
+        .arg("analyze")
+        .arg(missing_source)
+        .arg("--message-format=json")
+        .output()
+        .ok()?;
+    if !matches!(output.status.code(), Some(0 | 1)) || !output.stderr.is_empty() {
+        return None;
+    }
+    let stdout = String::from_utf8(output.stdout).ok()?;
+    let records = parse_analysis_jsonl(&stdout).ok()?;
+    validate_analysis_sequence(&records).ok()?;
+    let AnalysisRecord::Hello {
+        language_version,
+        compiler_commit,
+        build_target,
+        capabilities,
+        ..
+    } = records.first()?
+    else {
+        return None;
+    };
+    if language_version != &expected.language_version
+        || compiler_commit != &expected.compiler_commit
+        || build_target != &expected.build_target
+        || !capabilities
+            .iter()
+            .any(|capability| capability == "declarations")
+    {
+        return None;
+    }
+    Some(capabilities.clone())
 }
 
 pub fn check_saved(compiler: &Compiler, input: &Path) -> Result<DiagnosticReport, CheckError> {
@@ -383,6 +485,60 @@ pub fn check_saved(compiler: &Compiler, input: &Path) -> Result<DiagnosticReport
     Ok(DiagnosticReport { records })
 }
 
+pub fn analyze_saved(compiler: &Compiler, input: &Path) -> Result<AnalysisReport, AnalysisError> {
+    if compiler.identity.analysis_protocol_version != Some(ANALYSIS_PROTOCOL_VERSION)
+        || !compiler
+            .identity
+            .analysis_capabilities
+            .iter()
+            .any(|capability| capability == "declarations")
+    {
+        return Err(AnalysisError::Unsupported);
+    }
+    let output = Command::new(&compiler.executable)
+        .arg("analyze")
+        .arg(input)
+        .arg("--message-format=json")
+        .output()
+        .map_err(AnalysisError::Spawn)?;
+    if !matches!(output.status.code(), Some(0 | 1)) {
+        return Err(AnalysisError::Failed {
+            status: output.status.code(),
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        });
+    }
+    let stdout = String::from_utf8(output.stdout).map_err(|_| AnalysisError::NonUtf8)?;
+    let stderr = String::from_utf8(output.stderr).map_err(|_| AnalysisError::NonUtf8)?;
+    if !stderr.is_empty() {
+        return Err(AnalysisError::Failed {
+            status: output.status.code(),
+            stdout,
+            stderr,
+        });
+    }
+    let records = parse_analysis_jsonl(&stdout)
+        .map_err(|error| AnalysisError::InvalidJson(error.to_string()))?;
+    validate_analysis_sequence(&records)
+        .map_err(|error| AnalysisError::InvalidSequence(error.to_string()))?;
+    let Some(AnalysisRecord::Hello {
+        language_version,
+        compiler_commit,
+        build_target,
+        ..
+    }) = records.first()
+    else {
+        return Err(AnalysisError::InvalidSequence("missing hello".to_owned()));
+    };
+    if language_version != &compiler.identity.language_version
+        || compiler_commit != &compiler.identity.compiler_commit
+        || build_target != &compiler.identity.build_target
+    {
+        return Err(AnalysisError::CompilerChanged);
+    }
+    Ok(AnalysisReport { records })
+}
+
 fn failed(operation: &'static str, output: std::process::Output) -> ProbeError {
     ProbeError::Failed {
         operation,
@@ -427,6 +583,8 @@ fn identity_from_outputs(
             build_target: build_target.clone(),
             diagnostic_protocol_version: DIAGNOSTIC_PROTOCOL_VERSION,
             capabilities: capabilities.clone(),
+            analysis_protocol_version: None,
+            analysis_capabilities: Vec::new(),
         },
     })
 }
@@ -451,6 +609,8 @@ mod tests {
                 build_target: "test-target".to_owned(),
                 diagnostic_protocol_version: 1,
                 capabilities: vec!["byte-spans".to_owned()],
+                analysis_protocol_version: None,
+                analysis_capabilities: Vec::new(),
             },
         }
     }
@@ -559,6 +719,14 @@ mod tests {
             .expect("LUNA_BIN must implement the diagnostic protocol");
         assert_eq!(compiler.identity.language_version, "0.2.0-alpha");
         assert_eq!(compiler.identity.diagnostic_protocol_version, 1);
+        assert_eq!(compiler.identity.analysis_protocol_version, Some(1));
+        assert!(
+            compiler
+                .identity
+                .analysis_capabilities
+                .iter()
+                .any(|capability| capability == "declarations")
+        );
 
         let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/minimal.luna");
         let report =
@@ -566,6 +734,17 @@ mod tests {
         assert!(matches!(
             report.records.last(),
             Some(Record::Summary { success: true, .. })
+        ));
+
+        let analysis = analyze_saved(&compiler, &source)
+            .expect("LUNA_BIN must analyze a saved standalone source");
+        assert!(matches!(
+            analysis.records.last(),
+            Some(AnalysisRecord::Summary {
+                symbols: 1,
+                complete: true,
+                ..
+            })
         ));
     }
 }

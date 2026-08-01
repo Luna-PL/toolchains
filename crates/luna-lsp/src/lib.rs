@@ -2,8 +2,8 @@
 
 mod syntax;
 
-use luna_compiler::{Compiler, DiscoveryConfig, check_saved, discover};
-use luna_protocol::{Record, Span};
+use luna_compiler::{Compiler, DiscoveryConfig, analyze_saved, check_saved, discover};
+use luna_protocol::{AnalysisRecord, Record, Span, SymbolKind};
 use luna_workspace::compiler_check_target;
 use serde_json::{Value, json};
 use std::collections::{HashMap, HashSet};
@@ -30,6 +30,7 @@ struct Server {
     documents: HashMap<String, Document>,
     pending_checks: HashMap<String, Instant>,
     published_by_target: HashMap<PathBuf, HashSet<String>>,
+    analysis_by_target: HashMap<PathBuf, Vec<AnalysisRecord>>,
 }
 
 impl Server {
@@ -42,6 +43,7 @@ impl Server {
             documents: HashMap::new(),
             pending_checks: HashMap::new(),
             published_by_target: HashMap::new(),
+            analysis_by_target: HashMap::new(),
         }
     }
 
@@ -61,6 +63,13 @@ impl Server {
             }
             self.configure_compiler(&parameters);
             self.initialized = true;
+            let definition_provider = self.compiler.as_ref().is_some_and(|compiler| {
+                compiler
+                    .identity
+                    .analysis_capabilities
+                    .iter()
+                    .any(|capability| capability == "call-references")
+            });
             return respond(
                 output,
                 id,
@@ -73,7 +82,8 @@ impl Server {
                             "save": {"includeText": false}
                         },
                         "documentSymbolProvider": true,
-                        "foldingRangeProvider": true
+                        "foldingRangeProvider": true,
+                        "definitionProvider": definition_provider
                     },
                     "serverInfo": {"name": "luna-lsp", "version": "0.1.0"}
                 }),
@@ -121,6 +131,11 @@ impl Server {
             "textDocument/foldingRange" => {
                 if let Some(id) = id {
                     return respond(output, id, self.folding(&parameters));
+                }
+            }
+            "textDocument/definition" => {
+                if let Some(id) = id {
+                    return respond(output, id, self.definition(&parameters));
                 }
             }
             "$/cancelRequest" | "workspace/didChangeConfiguration" => {}
@@ -230,6 +245,8 @@ impl Server {
             .and_then(Value::as_i64)
             .unwrap_or(open.version);
         open.dirty = true;
+        let target = compiler_check_target(&open.path);
+        self.analysis_by_target.remove(&target);
         self.pending_checks.remove(uri);
         Ok(())
     }
@@ -302,7 +319,7 @@ impl Server {
             notify_log(output, 3, &format!("skipping unsaved Luna document {uri}"))?;
             return Ok(());
         }
-        let Some(compiler) = &self.compiler else {
+        let Some(compiler) = self.compiler.clone() else {
             notify_log(
                 output,
                 1,
@@ -313,13 +330,34 @@ impl Server {
             return Ok(());
         };
         let target = compiler_check_target(&document.path);
-        let report = match check_saved(compiler, &target) {
+        let report = match check_saved(&compiler, &target) {
             Ok(report) => report,
             Err(error) => {
                 notify_log(output, 1, &format!("Luna check failed: {error}"))?;
                 return Ok(());
             }
         };
+
+        if compiler.identity.analysis_protocol_version.is_some() {
+            match analyze_saved(&compiler, &target) {
+                Ok(analysis)
+                    if matches!(
+                        analysis.records.last(),
+                        Some(AnalysisRecord::Summary { complete: true, .. })
+                    ) =>
+                {
+                    self.analysis_by_target
+                        .insert(target.clone(), analysis.records);
+                }
+                Ok(_) => {
+                    self.analysis_by_target.remove(&target);
+                }
+                Err(error) => {
+                    self.analysis_by_target.remove(&target);
+                    notify_log(output, 2, &format!("Luna analysis failed: {error}"))?;
+                }
+            }
+        }
 
         let mut grouped: HashMap<String, Vec<Value>> = HashMap::new();
         for record in report.records {
@@ -380,15 +418,56 @@ impl Server {
     }
 
     fn symbols(&self, parameters: &Value) -> Value {
-        self.document_text(parameters)
-            .map(|source| Value::Array(syntax::document_symbols(source)))
-            .unwrap_or_else(|| Value::Array(Vec::new()))
+        let Some(uri) = parameters
+            .pointer("/textDocument/uri")
+            .and_then(Value::as_str)
+        else {
+            return Value::Array(Vec::new());
+        };
+        let Some(document) = self.documents.get(uri) else {
+            return Value::Array(Vec::new());
+        };
+        if !document.dirty {
+            let target = compiler_check_target(&document.path);
+            if let Some(records) = self.analysis_by_target.get(&target) {
+                return Value::Array(analysis_document_symbols(records, &document.path));
+            }
+        }
+        Value::Array(syntax::document_symbols(&document.text))
     }
 
     fn folding(&self, parameters: &Value) -> Value {
         self.document_text(parameters)
             .map(|source| Value::Array(syntax::folding_ranges(source)))
             .unwrap_or_else(|| Value::Array(Vec::new()))
+    }
+
+    fn definition(&self, parameters: &Value) -> Value {
+        let Some(uri) = parameters
+            .pointer("/textDocument/uri")
+            .and_then(Value::as_str)
+        else {
+            return Value::Null;
+        };
+        let Some(document) = self.documents.get(uri) else {
+            return Value::Null;
+        };
+        if document.dirty {
+            return Value::Null;
+        }
+        let Some(position) = parameters.get("position") else {
+            return Value::Null;
+        };
+        let Ok(byte) = syntax::lsp_position_to_byte(&document.text, position) else {
+            return Value::Null;
+        };
+        let target = compiler_check_target(&document.path);
+        self.analysis_by_target
+            .get(&target)
+            .and_then(|records| {
+                definition_from_analysis(records, &document.path, byte, &self.documents)
+            })
+            .unwrap_or(Value::Null)
     }
 
     fn document_text(&self, parameters: &Value) -> Option<&str> {
@@ -398,6 +477,85 @@ impl Server {
         self.documents
             .get(uri)
             .map(|document| document.text.as_str())
+    }
+}
+
+fn analysis_document_symbols(records: &[AnalysisRecord], path: &Path) -> Vec<Value> {
+    let expected = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    records
+        .iter()
+        .filter_map(|record| {
+            let AnalysisRecord::Symbol {
+                id,
+                name,
+                symbol_kind,
+                signature,
+                selection,
+                ..
+            } = record
+            else {
+                return None;
+            };
+            let actual = std::fs::canonicalize(&selection.path)
+                .unwrap_or_else(|_| PathBuf::from(&selection.path));
+            if actual != expected {
+                return None;
+            }
+            let range = lsp_range(selection);
+            Some(json!({
+                "name": name,
+                "detail": signature,
+                "kind": lsp_symbol_kind(*symbol_kind),
+                "range": range,
+                "selectionRange": range,
+                "data": {"symbolId": id}
+            }))
+        })
+        .collect()
+}
+
+fn definition_from_analysis(
+    records: &[AnalysisRecord],
+    source_path: &Path,
+    byte: usize,
+    documents: &HashMap<String, Document>,
+) -> Option<Value> {
+    let expected = std::fs::canonicalize(source_path).unwrap_or_else(|_| source_path.to_path_buf());
+    let target_id = records.iter().find_map(|record| {
+        let AnalysisRecord::Reference {
+            target_id, source, ..
+        } = record
+        else {
+            return None;
+        };
+        let actual =
+            std::fs::canonicalize(&source.path).unwrap_or_else(|_| PathBuf::from(&source.path));
+        (actual == expected
+            && source.start.byte as usize <= byte
+            && byte < source.end.byte as usize)
+            .then_some(target_id)
+    })?;
+    records.iter().find_map(|record| {
+        let AnalysisRecord::Symbol { id, selection, .. } = record else {
+            return None;
+        };
+        (id == target_id).then(|| {
+            json!({
+                "uri": uri_for_path(&selection.path, documents),
+                "range": lsp_range(selection)
+            })
+        })
+    })
+}
+
+fn lsp_symbol_kind(kind: SymbolKind) -> u32 {
+    match kind {
+        SymbolKind::Function | SymbolKind::Kernel | SymbolKind::Fragment => 12,
+        SymbolKind::Method => 6,
+        SymbolKind::Struct => 23,
+        SymbolKind::Enum => 10,
+        SymbolKind::Trait | SymbolKind::Constraint => 11,
+        SymbolKind::Metadata => 19,
     }
 }
 
@@ -702,6 +860,44 @@ mod tests {
         assert_eq!(
             byte_to_position(source, 5, 1, 1),
             json!({"line": 0, "character": 3})
+        );
+    }
+
+    #[test]
+    fn compiler_analysis_symbols_preserve_identity_and_signature() {
+        let records = luna_protocol::parse_analysis_jsonl(include_str!(
+            "../../../tests/protocol/analysis_v1.jsonl"
+        ))
+        .expect("analysis golden stream must parse");
+        let symbols = analysis_document_symbols(&records, Path::new("/workspace/main.luna"));
+        assert_eq!(symbols.len(), 1);
+        assert_eq!(symbols[0]["name"], "add");
+        assert_eq!(symbols[0]["kind"], 12);
+        assert_eq!(symbols[0]["detail"], "fn add(left: i32, right: i32) -> i32");
+        assert_eq!(
+            symbols[0].pointer("/data/symbolId"),
+            Some(&json!("luna.symbol.v1:4:main:0::8:function:9:main::add"))
+        );
+    }
+
+    #[test]
+    fn compiler_reference_resolves_definition_by_symbol_id() {
+        let records = luna_protocol::parse_analysis_jsonl(include_str!(
+            "../../../tests/protocol/analysis_v1.jsonl"
+        ))
+        .expect("analysis golden stream must parse");
+        let definition = definition_from_analysis(
+            &records,
+            Path::new("/workspace/main.luna"),
+            59,
+            &HashMap::new(),
+        )
+        .expect("reference must resolve");
+        assert_eq!(definition["uri"], "file:///workspace/main.luna");
+        assert_eq!(definition.pointer("/range/start/line"), Some(&json!(0)));
+        assert_eq!(
+            definition.pointer("/range/start/character"),
+            Some(&json!(3))
         );
     }
 }
