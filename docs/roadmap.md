@@ -50,8 +50,10 @@ Exit: formatting twice is byte-identical to formatting once.
 Status: in progress; declaration protocol v1 types, validation, compiler
 producer, client, saved-file document symbols, and direct-function,
 trait-method, type-syntax, and trait definition are implemented.
-Single-document dirty-buffer overlays are implemented; constructor/field
-references and multi-document overlays remain pending.
+Single- and multi-document dirty-buffer overlays are implemented with
+version-vector cache validation; constructor/field references remain pending.
+Package-scoped `textDocument/references` is implemented; rename and persistent
+multi-package indexing remain pending.
 
 - Compiler-owned analysis protocol and document overlays.
 - Hover, definition, completion, references, and rename in that order.

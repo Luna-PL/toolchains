@@ -8,7 +8,7 @@ LunaToolchain 是 Luna `0.2.0-alpha` 的独立编辑器与开发者工具工作�
 当前状态为 M4 语义工具进行中。`luna-protocol` 校验诊断和分析 JSONL，
 `luna-compiler` 按 capability 探测兼容编译器，`luna-lsp` 通过 stdio 提供已保存文件
 诊断、编译器驱动的 document symbol、直接函数、trait method、类型和 trait definition，
-以及 folding。生成的
+package reference、原子多文档脏 buffer 分析，以及 folding。生成的
 Tree-sitter grammar 与 `luna-fmt` 提供无损、保留注释的全文格式化。
 
 ## 仓库边界

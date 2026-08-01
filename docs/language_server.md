@@ -14,8 +14,10 @@ initialization or after shutdown, and leaves no persistent compiler child.
 Open documents use incremental UTF-16 synchronization. Changes update the
 server's versioned memory snapshot, invalidate older semantic results, and
 schedule analysis. Events within 150 ms are coalesced. A compiler advertising
-`single-document-overlay` receives dirty text over stdin; otherwise dirty
-documents retain the lexical fallback.
+`multi-document-overlay` receives every open dirty document in the same package
+as one versioned stdin request. With an older compiler, exactly one dirty file
+uses `single-document-overlay`; otherwise dirty documents retain the lexical
+fallback.
 
 ## Diagnostics
 
@@ -42,14 +44,19 @@ aid that tracks balanced braces outside comments and strings.
 methods, type-syntax names, and impl/bound trait names by opaque Symbol ID in a
 complete saved-file or version-matched overlay snapshot. Constructor and field
 references are not yet covered. Hover,
-completion, workspace references, and rename remain disabled until the compiler protocol exposes the
+completion, and rename remain disabled until the compiler protocol exposes the
 additional semantic records each operation requires.
 
-The current overlay capability replaces one root-package document. When
-several files in the same package are dirty, each analysis sees the requested
-document plus disk versions of the others; multi-document overlay remains a
-separate protocol milestone. Dirty-buffer diagnostics also remain pending a
-structured diagnostic-overlay capability.
+`textDocument/references` is advertised only with `package-references`. A
+request may start on a declaration or any emitted reference and returns all
+matching locations in the current complete package snapshot. It honors
+`context.includeDeclaration`. Results cover only the reference classes listed
+by the compiler; persistent multi-package workspace indexing remains pending.
+
+Multi-document analysis replaces all open dirty root-package documents
+atomically and caches the snapshot against every participating LSP version.
+Other package sources and dependencies remain disk-backed. Dirty-buffer
+diagnostics remain pending a structured diagnostic-overlay capability.
 
 ## VS Code configuration
 

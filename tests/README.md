@@ -13,7 +13,7 @@ workspace test run.
 `luna-lsp` has stdio integration tests covering lifecycle, symbols, folding,
 and—when `LUNA_BIN` is set—real compiler diagnostics; direct-function,
 trait-method, type, and trait definition; and version-matched Unicode
-dirty-buffer overlay definition.
+single- and multi-document dirty-buffer definition and package references.
 `luna-fmt` tests comment preservation, idempotence, `--check`, `--write`, stdin,
 malformed-input immutability, and an optional compiler source corpus. When both
 `LUNA_SOURCE_DIR` and `LUNA_BIN` are set, the real compiler also checks every

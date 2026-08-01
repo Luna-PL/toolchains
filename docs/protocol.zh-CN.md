@@ -62,9 +62,14 @@ fix 是带 applicability（`machine-applicable`、`maybe-incorrect` 或 `manual`
 拥有的符号身份和类型；`call-references` 增加已解析的直接调用目标。
 `method-references` 增加已解析的用户 trait method 调用目标。
 `type-references` 增加类型语法中的用户 struct、enum 和 metadata schema 名称；
-`trait-references` 增加 impl 与 bound 中已解析的 trait 名称。
+`trait-references` 增加 impl 与 bound 中已解析的 trait 名称。`package-references` 声明
+客户端可以在一个完整 package 快照中对所有已输出 reference record 按 Symbol ID 反向查询；
+其覆盖范围是各个独立广告引用类别的并集。
 `single-document-overlay` 通过 `--overlay` 接收一个真实源码路径，从 stdin 读取替换的
-UTF-8 文本，同时正常解析所选 package。
+UTF-8 文本，同时正常解析所选 package。`multi-document-overlay` 接受
+`--overlays-from-stdin` 和带版本的 `luna.overlay` JSON 对象，其中包含非空
+`{"path", "text"}` 替换数组。编译器在 package 分析前验证整组输入，因此快照不会只混入
+其中一部分文档。
 
 ```json
 {
@@ -103,6 +108,6 @@ trait method 调用；`type-references` 覆盖类型语法中已解析的用户�
 Rust wire type 和序列校验已经在 `luna-protocol` 中实现；配套编译器生产端及按
 capability 开关的 `luna-compiler` 客户端也已实现。完整保存文件快照具备任一已广告的
 reference capability 时已经启用 definition，版本匹配的完整 overlay 快照具有相同语义。
-hover、workspace
-reference、completion 和 rename 必须使用后续显式 capability，不能从 MoonIR 名字或
+只有具备 `package-references` 时才启用 package 范围的 `textDocument/references`。hover、
+completion、rename 和更广的 workspace 索引必须使用后续显式 capability，不能从 MoonIR 名字或
 渲染诊断中推断。

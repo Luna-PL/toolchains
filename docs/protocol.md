@@ -74,10 +74,16 @@ symbol identity and types. `call-references` adds resolved direct-call targets.
 `method-references` adds resolved user trait-method targets.
 `type-references` adds user struct, enum, and metadata-schema names appearing
 in type syntax. `trait-references` adds resolved trait names in impls and
-bounds.
+bounds. `package-references` declares that clients may reverse-query Symbol IDs
+across every emitted reference record in one complete package snapshot; its
+coverage is the union of the separately advertised reference classes.
 `single-document-overlay` accepts one real source path through `--overlay` and
 reads its replacement UTF-8 text from stdin while resolving the selected
-package normally.
+package normally. `multi-document-overlay` accepts `--overlays-from-stdin` and
+a versioned `luna.overlay` JSON object containing a non-empty array of
+`{"path", "text"}` replacements. The compiler validates the whole set before
+package analysis, so one snapshot never mixes only a subset of the requested
+documents.
 
 ```json
 {
@@ -121,6 +127,7 @@ The Rust wire types and sequence validator are implemented in
 `luna-compiler` client are implemented. Definition is enabled for complete
 saved-file snapshots with
 any advertised reference capability; a complete version-matched overlay
-snapshot has the same semantics. Hover, workspace references, completion, and rename must use
-future explicit capabilities and must not be inferred from MoonIR names or
-rendered diagnostics.
+snapshot has the same semantics. Package-scoped `textDocument/references` is
+enabled only with `package-references`. Hover, completion, rename, and broader
+workspace indexing require future explicit capabilities and must not be
+inferred from MoonIR names or rendered diagnostics.

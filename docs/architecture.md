@@ -35,10 +35,11 @@ probing `--version` and `luna.diagnostic` JSONL identity, then independently
 probing optional `luna.analysis` identity and capabilities. The first
 language server consumes this API and must not parse human-rendered stderr as a
 stable API. Saved-file diagnostics remain separate. Compilers advertising
-`single-document-overlay` accept the current document through stdin while
-loading the rest of its package normally; no temporary package layout is
-created. A future multi-document or daemon transport is required before one
-snapshot can combine several dirty files.
+`multi-document-overlay` accept a versioned JSON stdin envelope containing
+every dirty root-package document. The language server caches the result
+against the complete canonical path/version map; any edit, save, or close
+invalidates it. Older compilers retain the original single-document fallback
+when exactly one file is dirty. No temporary package layout is created.
 
 ## Syntax boundary
 

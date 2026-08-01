@@ -7,3 +7,4 @@ publish = false
 
 [dependencies]
 luna-protocol = { path = "../luna-protocol" }
+serde_json.workspace = true

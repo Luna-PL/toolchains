@@ -3,7 +3,8 @@
 mod syntax;
 
 use luna_compiler::{
-    Compiler, DiscoveryConfig, analyze_overlay, analyze_saved, check_saved, discover,
+    AnalysisOverlay, Compiler, DiscoveryConfig, analyze_overlay, analyze_overlays, analyze_saved,
+    check_saved, discover,
 };
 use luna_protocol::{AnalysisRecord, Record, Span, SymbolKind};
 use luna_workspace::compiler_check_target;
@@ -26,8 +27,7 @@ struct Document {
 
 struct AnalysisCache {
     records: Vec<AnalysisRecord>,
-    overlay_path: Option<PathBuf>,
-    overlay_version: Option<i64>,
+    overlay_versions: HashMap<PathBuf, i64>,
 }
 
 struct Server {
@@ -86,6 +86,13 @@ impl Server {
                         )
                     })
             });
+            let references_provider = self.compiler.as_ref().is_some_and(|compiler| {
+                compiler
+                    .identity
+                    .analysis_capabilities
+                    .iter()
+                    .any(|capability| capability == "package-references")
+            });
             return respond(
                 output,
                 id,
@@ -99,7 +106,8 @@ impl Server {
                         },
                         "documentSymbolProvider": true,
                         "foldingRangeProvider": true,
-                        "definitionProvider": definition_provider
+                        "definitionProvider": definition_provider,
+                        "referencesProvider": references_provider
                     },
                     "serverInfo": {"name": "luna-lsp", "version": "0.1.0"}
                 }),
@@ -152,6 +160,11 @@ impl Server {
             "textDocument/definition" => {
                 if let Some(id) = id {
                     return respond(output, id, self.definition(&parameters));
+                }
+            }
+            "textDocument/references" => {
+                if let Some(id) = id {
+                    return respond(output, id, self.references(&parameters));
                 }
             }
             "$/cancelRequest" | "workspace/didChangeConfiguration" => {}
@@ -225,6 +238,7 @@ impl Server {
             .to_owned();
         let version = document.get("version").and_then(Value::as_i64).unwrap_or(0);
         let matches_disk = std::fs::read_to_string(&path).is_ok_and(|saved| saved == text);
+        let target = compiler_check_target(&path);
         self.documents.insert(
             uri.to_owned(),
             Document {
@@ -234,6 +248,9 @@ impl Server {
                 dirty: !matches_disk,
             },
         );
+        if !matches_disk {
+            self.analysis_by_target.remove(&target);
+        }
         self.schedule(uri);
     }
 
@@ -277,6 +294,8 @@ impl Server {
                 document.text = text.to_owned();
             }
             document.dirty = false;
+            let target = compiler_check_target(&document.path);
+            self.analysis_by_target.remove(&target);
             self.schedule(uri);
         }
     }
@@ -290,10 +309,11 @@ impl Server {
         };
         if let Some(document) = self.documents.remove(uri) {
             let target = compiler_check_target(&document.path);
+            let document_path = canonical_document_path(&document.path);
             if self
                 .analysis_by_target
                 .get(&target)
-                .is_some_and(|cache| cache.overlay_path.as_deref() == Some(document.path.as_path()))
+                .is_some_and(|cache| cache.overlay_versions.contains_key(&document_path))
             {
                 self.analysis_by_target.remove(&target);
             }
@@ -334,10 +354,10 @@ impl Server {
         let Some(document) = self.documents.get(uri).cloned() else {
             return Ok(());
         };
-        let Ok(saved) = std::fs::read_to_string(&document.path) else {
+        if std::fs::read_to_string(&document.path).is_err() {
             notify_log(output, 1, &format!("cannot read saved Luna source {uri}"))?;
             return Ok(());
-        };
+        }
         let Some(compiler) = self.compiler.clone() else {
             notify_log(
                 output,
@@ -349,39 +369,81 @@ impl Server {
             return Ok(());
         };
         let target = compiler_check_target(&document.path);
-        if document.dirty || saved != document.text {
-            if compiler
+        let mut overlay_documents: Vec<(AnalysisOverlay, i64)> = self
+            .documents
+            .values()
+            .filter(|open| compiler_check_target(&open.path) == target)
+            .filter(|open| {
+                open.dirty
+                    || std::fs::read_to_string(&open.path).is_ok_and(|disk| disk != open.text)
+            })
+            .map(|open| {
+                (
+                    AnalysisOverlay {
+                        path: open.path.clone(),
+                        text: open.text.clone(),
+                    },
+                    open.version,
+                )
+            })
+            .collect();
+        overlay_documents.sort_by(|left, right| left.0.path.cmp(&right.0.path));
+        if !overlay_documents.is_empty() {
+            let supports_multi = compiler
                 .identity
                 .analysis_capabilities
                 .iter()
-                .any(|capability| capability == "single-document-overlay")
-            {
-                match analyze_overlay(&compiler, &target, &document.path, &document.text) {
-                    Ok(analysis)
-                        if matches!(
-                            analysis.records.last(),
-                            Some(AnalysisRecord::Summary { complete: true, .. })
-                        ) =>
-                    {
-                        self.analysis_by_target.insert(
-                            target,
-                            AnalysisCache {
-                                records: analysis.records,
-                                overlay_path: Some(document.path),
-                                overlay_version: Some(document.version),
-                            },
-                        );
-                    }
-                    Ok(_) => {
-                        self.analysis_by_target.remove(&target);
-                    }
-                    Err(error) => {
-                        self.analysis_by_target.remove(&target);
-                        notify_log(output, 2, &format!("Luna overlay analysis failed: {error}"))?;
-                    }
-                }
+                .any(|capability| capability == "multi-document-overlay");
+            let supports_single = compiler
+                .identity
+                .analysis_capabilities
+                .iter()
+                .any(|capability| capability == "single-document-overlay");
+            let overlay_versions = overlay_documents
+                .iter()
+                .map(|(overlay, version)| (canonical_document_path(&overlay.path), *version))
+                .collect();
+            let overlays: Vec<AnalysisOverlay> = overlay_documents
+                .into_iter()
+                .map(|(overlay, _)| overlay)
+                .collect();
+            let analysis = if supports_multi {
+                analyze_overlays(&compiler, &target, &overlays)
+            } else if supports_single && overlays.len() == 1 {
+                analyze_overlay(&compiler, &target, &overlays[0].path, &overlays[0].text)
             } else {
-                notify_log(output, 3, &format!("skipping unsaved Luna document {uri}"))?;
+                notify_log(
+                    output,
+                    3,
+                    &format!(
+                        "skipping {} unsaved Luna documents for {uri}",
+                        overlays.len()
+                    ),
+                )?;
+                return Ok(());
+            };
+            match analysis {
+                Ok(analysis)
+                    if matches!(
+                        analysis.records.last(),
+                        Some(AnalysisRecord::Summary { complete: true, .. })
+                    ) =>
+                {
+                    self.analysis_by_target.insert(
+                        target,
+                        AnalysisCache {
+                            records: analysis.records,
+                            overlay_versions,
+                        },
+                    );
+                }
+                Ok(_) => {
+                    self.analysis_by_target.remove(&target);
+                }
+                Err(error) => {
+                    self.analysis_by_target.remove(&target);
+                    notify_log(output, 2, &format!("Luna overlay analysis failed: {error}"))?;
+                }
             }
             return Ok(());
         }
@@ -405,8 +467,7 @@ impl Server {
                         target.clone(),
                         AnalysisCache {
                             records: analysis.records,
-                            overlay_path: None,
-                            overlay_version: None,
+                            overlay_versions: HashMap::new(),
                         },
                     );
                 }
@@ -523,20 +584,54 @@ impl Server {
             .unwrap_or(Value::Null)
     }
 
+    fn references(&self, parameters: &Value) -> Value {
+        let Some(uri) = parameters
+            .pointer("/textDocument/uri")
+            .and_then(Value::as_str)
+        else {
+            return Value::Array(Vec::new());
+        };
+        let Some(document) = self.documents.get(uri) else {
+            return Value::Array(Vec::new());
+        };
+        let Some(position) = parameters.get("position") else {
+            return Value::Array(Vec::new());
+        };
+        let Ok(byte) = syntax::lsp_position_to_byte(&document.text, position) else {
+            return Value::Array(Vec::new());
+        };
+        let include_declaration = parameters
+            .pointer("/context/includeDeclaration")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        self.analysis_records_for(document)
+            .map(|records| {
+                Value::Array(references_from_analysis(
+                    records,
+                    &document.path,
+                    byte,
+                    include_declaration,
+                    &self.documents,
+                ))
+            })
+            .unwrap_or_else(|| Value::Array(Vec::new()))
+    }
+
     fn analysis_records_for(&self, document: &Document) -> Option<&[AnalysisRecord]> {
         let target = compiler_check_target(&document.path);
         let cache = self.analysis_by_target.get(&target)?;
-        if document.dirty {
-            let expected =
-                std::fs::canonicalize(&document.path).unwrap_or_else(|_| document.path.clone());
-            let actual = cache
-                .overlay_path
-                .as_ref()
-                .map(|path| std::fs::canonicalize(path).unwrap_or_else(|_| path.clone()));
-            if actual.as_ref() != Some(&expected) || cache.overlay_version != Some(document.version)
-            {
-                return None;
-            }
+        let current_overlay_versions: HashMap<PathBuf, i64> = self
+            .documents
+            .values()
+            .filter(|open| compiler_check_target(&open.path) == target)
+            .filter(|open| {
+                open.dirty
+                    || std::fs::read_to_string(&open.path).is_ok_and(|disk| disk != open.text)
+            })
+            .map(|open| (canonical_document_path(&open.path), open.version))
+            .collect();
+        if current_overlay_versions != cache.overlay_versions {
+            return None;
         }
         Some(&cache.records)
     }
@@ -616,6 +711,81 @@ fn definition_from_analysis(
                 "range": lsp_range_for_documents(selection, documents)
             })
         })
+    })
+}
+
+fn references_from_analysis(
+    records: &[AnalysisRecord],
+    source_path: &Path,
+    byte: usize,
+    include_declaration: bool,
+    documents: &HashMap<String, Document>,
+) -> Vec<Value> {
+    let Some(target_id) = symbol_id_at_analysis_position(records, source_path, byte) else {
+        return Vec::new();
+    };
+    let mut locations = Vec::new();
+    if include_declaration
+        && let Some(selection) = records.iter().find_map(|record| {
+            let AnalysisRecord::Symbol { id, selection, .. } = record else {
+                return None;
+            };
+            (id == target_id).then_some(selection)
+        })
+    {
+        locations.push(analysis_location(selection, documents));
+    }
+    locations.extend(records.iter().filter_map(|record| {
+        let AnalysisRecord::Reference {
+            target_id: reference_target,
+            source,
+            ..
+        } = record
+        else {
+            return None;
+        };
+        (reference_target == target_id).then(|| analysis_location(source, documents))
+    }));
+    locations
+}
+
+fn symbol_id_at_analysis_position<'a>(
+    records: &'a [AnalysisRecord],
+    source_path: &Path,
+    byte: usize,
+) -> Option<&'a str> {
+    let expected = canonical_document_path(source_path);
+    records
+        .iter()
+        .find_map(|record| {
+            let AnalysisRecord::Reference {
+                target_id, source, ..
+            } = record
+            else {
+                return None;
+            };
+            span_contains_byte(source, &expected, byte).then_some(target_id.as_str())
+        })
+        .or_else(|| {
+            records.iter().find_map(|record| {
+                let AnalysisRecord::Symbol { id, selection, .. } = record else {
+                    return None;
+                };
+                span_contains_byte(selection, &expected, byte).then_some(id.as_str())
+            })
+        })
+}
+
+fn span_contains_byte(span: &Span, expected_path: &Path, byte: usize) -> bool {
+    canonical_document_path(Path::new(&span.path)) == expected_path
+        && span.start.byte as usize <= byte
+        && byte < span.end.byte as usize
+}
+
+fn analysis_location(span: &Span, documents: &HashMap<String, Document>) -> Value {
+    json!({
+        "uri": uri_for_path(&span.path, documents),
+        "range": lsp_range_for_documents(span, documents)
     })
 }
 
@@ -850,6 +1020,10 @@ fn uri_for_path(path: &str, documents: &HashMap<String, Document>) -> String {
         .unwrap_or_else(|| path_to_file_uri(&diagnostic_path))
 }
 
+fn canonical_document_path(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
 fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
     let encoded = uri.strip_prefix("file://")?;
     let encoded = encoded.strip_prefix("localhost").unwrap_or(encoded);
@@ -988,6 +1162,38 @@ mod tests {
         assert_eq!(definition.pointer("/range/start/line"), Some(&json!(0)));
         assert_eq!(
             definition.pointer("/range/start/character"),
+            Some(&json!(3))
+        );
+    }
+
+    #[test]
+    fn compiler_references_resolve_from_declaration_and_reference() {
+        let records = luna_protocol::parse_analysis_jsonl(include_str!(
+            "../../../tests/protocol/analysis_v1.jsonl"
+        ))
+        .expect("analysis golden stream must parse");
+        let from_declaration = references_from_analysis(
+            &records,
+            Path::new("/workspace/main.luna"),
+            4,
+            false,
+            &HashMap::new(),
+        );
+        assert_eq!(from_declaration.len(), 1);
+        assert_eq!(
+            from_declaration[0].pointer("/range/start/line"),
+            Some(&json!(2))
+        );
+        let from_reference = references_from_analysis(
+            &records,
+            Path::new("/workspace/main.luna"),
+            59,
+            true,
+            &HashMap::new(),
+        );
+        assert_eq!(from_reference.len(), 2);
+        assert_eq!(
+            from_reference[0].pointer("/range/start/character"),
             Some(&json!(3))
         );
     }

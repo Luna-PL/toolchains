@@ -1,0 +1,4 @@
+package org.luna.toolchain.multi_overlay;
+module api;
+
+export fn saved_answer() -> i32 { return 42; }

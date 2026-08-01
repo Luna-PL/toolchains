@@ -1,0 +1,6 @@
+package org.luna.toolchain.multi_overlay;
+module application;
+
+fn main() -> i32 {
+    return api::saved_answer();
+}

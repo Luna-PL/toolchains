@@ -12,8 +12,9 @@
 请求，并且不会留下持久编译器子进程。
 
 打开的文档使用增量 UTF-16 同步。修改会更新带版本的内存 snapshot、使旧语义结果
-失效并安排分析；150ms 内的事件会合并。编译器报告 `single-document-overlay` 时，脏
-文本通过 stdin 传入；否则脏文档继续使用词法 fallback。
+失效并安排分析；150ms 内的事件会合并。编译器报告 `multi-document-overlay` 时，同一
+package 中所有打开的脏文档会组成一次带版本的 stdin 请求。对旧编译器，只有一个脏文件时使用
+`single-document-overlay`；否则脏文档继续使用词法 fallback。
 
 ## 诊断
 
@@ -34,12 +35,16 @@ folding 仍跟踪注释和字符串之外的配对大括号。
 `trait-references` capability 时才声明 `textDocument/definition`。它在完整的保存文件或版本匹配的
 overlay 快照中通过不透明 Symbol ID 解析直接函数、用户 trait method、类型语法名称和
 impl/bound trait 名称；构造器和字段引用尚未覆盖。
-hover、completion、workspace reference 和 rename 仍需编译器协议
+hover、completion 和 rename 仍需编译器协议
 提供各自所需的更多语义记录，目前保持禁用。
 
-当前 overlay capability 只替换根 package 中一个文档。同一 package 有多个脏文件时，
-每次分析只看到请求文档和其他文件的磁盘版本；多文档 overlay 是独立的后续协议里程碑。
-脏 buffer 诊断也要等待结构化 diagnostic-overlay capability。
+仅当编译器报告 `package-references` 时才声明 `textDocument/references`。请求可以从声明或
+任意已输出引用位置发起，并返回当前完整 package 快照中的所有匹配位置；它遵守
+`context.includeDeclaration`。结果仅覆盖编译器广告的引用类别，持久化多 package workspace 索引仍待实现。
+
+多文档分析会原子替换所有打开的根 package 脏文档，并把快照绑定到每个参与文档的
+LSP 版本。其他 package 源码和依赖仍使用磁盘版本。脏 buffer 诊断仍要等待结构化
+diagnostic-overlay capability。
 
 ## VS Code 配置
 

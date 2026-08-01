@@ -32,9 +32,9 @@
 候选同时通过 `--version` 和 `luna.diagnostic` JSONL 身份探测后才接受，随后独立探测
 可选的 `luna.analysis` 身份与 capability。首版
 language server 消费该 API；人类可读 stderr 不是稳定 API，保存文件诊断仍保持独立。
-报告 `single-document-overlay` 的编译器通过 stdin 接收当前文档，同时正常加载 package
-其余文件，不创建临时 package 布局。要在一个快照中组合多个脏文件，仍需后续多文档或
-daemon 传输。
+报告 `multi-document-overlay` 的编译器通过带版本的 JSON stdin envelope 接收根 package 中
+所有脏文档。language server 把结果绑定到完整的规范路径/版本表；任何编辑、保存或关闭都会
+使其失效。旧编译器在只有一个脏文件时保留原有单文档 fallback，全程不创建临时 package 布局。
 
 ## 语法边界
 

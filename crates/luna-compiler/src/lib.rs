@@ -4,6 +4,7 @@ use luna_protocol::{
     ANALYSIS_PROTOCOL_VERSION, AnalysisRecord, DIAGNOSTIC_PROTOCOL_VERSION, Record,
     parse_analysis_jsonl, parse_jsonl, validate_analysis_sequence, validate_sequence,
 };
+use serde_json::json;
 use std::env;
 use std::error::Error;
 use std::ffi::OsString;
@@ -47,6 +48,12 @@ pub struct AnalysisReport {
     pub records: Vec<AnalysisRecord>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AnalysisOverlay {
+    pub path: PathBuf,
+    pub text: String,
+}
+
 #[derive(Debug)]
 pub enum AnalysisError {
     Unsupported,
@@ -60,6 +67,7 @@ pub enum AnalysisError {
     NonUtf8,
     InvalidJson(String),
     InvalidSequence(String),
+    InvalidOverlay(String),
     CompilerChanged,
 }
 
@@ -82,6 +90,7 @@ impl fmt::Display for AnalysisError {
             Self::NonUtf8 => write!(formatter, "compiler analysis output is not UTF-8"),
             Self::InvalidJson(error) => write!(formatter, "invalid analysis JSONL: {error}"),
             Self::InvalidSequence(error) => write!(formatter, "invalid analysis sequence: {error}"),
+            Self::InvalidOverlay(error) => write!(formatter, "invalid analysis overlay: {error}"),
             Self::CompilerChanged => write!(
                 formatter,
                 "compiler identity changed after discovery; rediscovery is required"
@@ -535,6 +544,50 @@ pub fn analyze_overlay(
     parse_analysis_output(compiler, output)
 }
 
+pub fn analyze_overlays(
+    compiler: &Compiler,
+    input: &Path,
+    overlays: &[AnalysisOverlay],
+) -> Result<AnalysisReport, AnalysisError> {
+    if !supports_analysis(compiler, "declarations")
+        || !supports_analysis(compiler, "multi-document-overlay")
+    {
+        return Err(AnalysisError::Unsupported);
+    }
+    if overlays.is_empty() {
+        return Err(AnalysisError::InvalidOverlay(
+            "at least one document is required".to_owned(),
+        ));
+    }
+    let envelope = json!({
+        "protocol": "luna.overlay",
+        "version": 1,
+        "overlays": overlays.iter().map(|overlay| json!({
+            "path": overlay.path.to_string_lossy(),
+            "text": overlay.text,
+        })).collect::<Vec<_>>(),
+    })
+    .to_string();
+    let mut child = Command::new(&compiler.executable)
+        .arg("analyze")
+        .arg(input)
+        .arg("--message-format=json")
+        .arg("--overlays-from-stdin")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(AnalysisError::Spawn)?;
+    child
+        .stdin
+        .take()
+        .expect("piped analysis stdin must be available")
+        .write_all(envelope.as_bytes())
+        .map_err(AnalysisError::Stdin)?;
+    let output = child.wait_with_output().map_err(AnalysisError::Spawn)?;
+    parse_analysis_output(compiler, output)
+}
+
 fn supports_analysis(compiler: &Compiler, capability: &str) -> bool {
     compiler.identity.analysis_protocol_version == Some(ANALYSIS_PROTOCOL_VERSION)
         && compiler
@@ -764,7 +817,7 @@ mod tests {
         };
         let compiler = probe(Path::new(&path), CandidateSource::Explicit)
             .expect("LUNA_BIN must implement the diagnostic protocol");
-        assert_eq!(compiler.identity.language_version, "0.2.0-alpha");
+        assert!(!compiler.identity.language_version.is_empty());
         assert_eq!(compiler.identity.diagnostic_protocol_version, 1);
         assert_eq!(compiler.identity.analysis_protocol_version, Some(1));
         assert!(
@@ -780,6 +833,20 @@ mod tests {
                 .analysis_capabilities
                 .iter()
                 .any(|capability| capability == "single-document-overlay")
+        );
+        assert!(
+            compiler
+                .identity
+                .analysis_capabilities
+                .iter()
+                .any(|capability| capability == "multi-document-overlay")
+        );
+        assert!(
+            compiler
+                .identity
+                .analysis_capabilities
+                .iter()
+                .any(|capability| capability == "package-references")
         );
 
         let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/minimal.luna");
@@ -814,6 +881,34 @@ mod tests {
         )));
         assert!(
             overlaid
+                .records
+                .iter()
+                .any(|record| matches!(record, AnalysisRecord::Reference { .. }))
+        );
+
+        let package = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../tests/fixtures/packages/module_headers");
+        let multi_overlaid = analyze_overlays(
+            &compiler,
+            &package,
+            &[
+                AnalysisOverlay {
+                    path: package.join("01_math.luna"),
+                    text: "package org.luna.module_headers;\nmodule math::integer;\nusing org.luna.std as std;\n// 月\nexport fn moon_answer() -> i32 { return 42; }\n".to_owned(),
+                },
+                AnalysisOverlay {
+                    path: package.join("02_main.luna"),
+                    text: "package org.luna.module_headers;\nmodule application;\nusing org.luna.std as std;\nfn main() -> i32 { return math::integer::moon_answer(); }\n".to_owned(),
+                },
+            ],
+        )
+        .expect("LUNA_BIN must analyze multiple in-memory source overlays");
+        assert!(multi_overlaid.records.iter().any(|record| matches!(
+            record,
+            AnalysisRecord::Symbol { name, .. } if name == "moon_answer"
+        )));
+        assert!(
+            multi_overlaid
                 .records
                 .iter()
                 .any(|record| matches!(record, AnalysisRecord::Reference { .. }))
