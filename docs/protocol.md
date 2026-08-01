@@ -77,6 +77,9 @@ in type syntax. `trait-references` adds resolved trait names in impls and
 bounds. `package-references` declares that clients may reverse-query Symbol IDs
 across every emitted reference record in one complete package snapshot; its
 coverage is the union of the separately advertised reference classes.
+`field-references` covers fields of named struct declarations; anonymous
+record fields have no declaration Symbol ID. `enum-variant-references` covers
+variant construction and match patterns, including their explicit enum owner.
 `single-document-overlay` accepts one real source path through `--overlay` and
 reads its replacement UTF-8 text from stdin while resolving the selected
 package normally. `multi-document-overlay` accepts `--overlays-from-stdin` and
@@ -121,6 +124,8 @@ reference classes explicitly named by capabilities; v1 currently guarantees
 direct function calls through `call-references` and resolved user trait-method
 calls through `method-references`. `type-references` covers resolved user type
 names in type syntax; `trait-references` covers impl and bound trait names.
+`field-references` and `enum-variant-references` use child Symbol IDs whose
+identity is derived from the compiler-resolved parent declaration.
 
 The Rust wire types and sequence validator are implemented in
 `luna-protocol`. The companion compiler producer and capability-gated

@@ -82,6 +82,8 @@ impl Server {
                             "call-references"
                                 | "method-references"
                                 | "type-references"
+                                | "field-references"
+                                | "enum-variant-references"
                                 | "trait-references"
                         )
                     })
@@ -797,6 +799,8 @@ fn lsp_symbol_kind(kind: SymbolKind) -> u32 {
         SymbolKind::Enum => 10,
         SymbolKind::Trait | SymbolKind::Constraint => 11,
         SymbolKind::Metadata => 19,
+        SymbolKind::Field => 8,
+        SymbolKind::EnumVariant => 22,
     }
 }
 
@@ -1120,6 +1124,12 @@ mod tests {
             byte_to_position(source, 5, 1, 1),
             json!({"line": 0, "character": 3})
         );
+    }
+
+    #[test]
+    fn member_symbols_use_lsp_member_kinds() {
+        assert_eq!(lsp_symbol_kind(SymbolKind::Field), 8);
+        assert_eq!(lsp_symbol_kind(SymbolKind::EnumVariant), 22);
     }
 
     #[test]

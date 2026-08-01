@@ -9,7 +9,8 @@ has its own Git history, releases, compatibility policy, and version number.
 Current status: M4 semantic tooling in progress. `luna-protocol` validates
 diagnostic and analysis JSONL, `luna-compiler` capability-probes compatible
 compilers, and `luna-lsp` provides saved-file diagnostics, compiler-backed
-document symbols, direct-function, trait-method, type, and trait definition,
+document symbols, direct-function, trait-method, type, trait, struct-field, and
+enum-variant definition,
 package references, atomic multi-document dirty-buffer analysis, and folding
 over stdio. The generated
 Tree-sitter grammar and `luna-fmt` provide lossless, comment-preserving

@@ -65,6 +65,8 @@ fix 是带 applicability（`machine-applicable`、`maybe-incorrect` 或 `manual`
 `trait-references` 增加 impl 与 bound 中已解析的 trait 名称。`package-references` 声明
 客户端可以在一个完整 package 快照中对所有已输出 reference record 按 Symbol ID 反向查询；
 其覆盖范围是各个独立广告引用类别的并集。
+`field-references` 覆盖有名 struct 声明的字段；匿名 record 字段没有声明 Symbol ID。
+`enum-variant-references` 覆盖 variant 构造与 match 模式，包括显式 enum owner。
 `single-document-overlay` 通过 `--overlay` 接收一个真实源码路径，从 stdin 读取替换的
 UTF-8 文本，同时正常解析所选 package。`multi-document-overlay` 接受
 `--overlays-from-stdin` 和带版本的 `luna.overlay` JSON 对象，其中包含非空
@@ -104,6 +106,8 @@ summary 给出 symbol/reference 记录数和 `complete`。解析恢复或语义�
 `call-references` 保证直接函数调用，`method-references` 保证已解析的用户
 trait method 调用；`type-references` 覆盖类型语法中已解析的用户类型名，
 `trait-references` 覆盖 impl 和 bound 中的 trait 名。
+`field-references` 和 `enum-variant-references` 使用由编译器已解析父声明派生的
+成员 Symbol ID。
 
 Rust wire type 和序列校验已经在 `luna-protocol` 中实现；配套编译器生产端及按
 capability 开关的 `luna-compiler` 客户端也已实现。完整保存文件快照具备任一已广告的

@@ -39,11 +39,12 @@ server retains the lexical declaration fallback. Folding remains a structural
 aid that tracks balanced braces outside comments and strings.
 
 `textDocument/definition` is advertised only when the compiler reports the
-`call-references`, `method-references`, `type-references`, or
-`trait-references` capability. It resolves direct functions, user trait
-methods, type-syntax names, and impl/bound trait names by opaque Symbol ID in a
-complete saved-file or version-matched overlay snapshot. Constructor and field
-references are not yet covered. Hover,
+`call-references`, `method-references`, `type-references`,
+`trait-references`, `field-references`, or `enum-variant-references`
+capability. It resolves direct functions, user trait methods, type-syntax
+names, impl/bound trait names, struct fields, and enum construction/match
+variants by opaque Symbol ID in a complete saved-file or version-matched
+overlay snapshot. Hover,
 completion, and rename remain disabled until the compiler protocol exposes the
 additional semantic records each operation requires.
 

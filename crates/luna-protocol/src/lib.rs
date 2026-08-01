@@ -110,6 +110,8 @@ pub enum SymbolKind {
     Trait,
     Metadata,
     Constraint,
+    Field,
+    EnumVariant,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -478,6 +480,21 @@ mod tests {
                 ..
             } if target_id.starts_with("luna.symbol.v1") && start.byte == 58 && end.byte == 61
         ));
+    }
+
+    #[test]
+    fn parses_member_symbol_kinds() {
+        for (wire_name, expected) in [
+            ("field", SymbolKind::Field),
+            ("enum-variant", SymbolKind::EnumVariant),
+        ] {
+            let encoded = format!("\"{wire_name}\"");
+            assert_eq!(
+                serde_json::from_str::<SymbolKind>(&encoded)
+                    .expect("member symbol kind must deserialize"),
+                expected
+            );
+        }
     }
 
     #[test]

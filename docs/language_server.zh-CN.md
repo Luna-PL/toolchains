@@ -31,10 +31,11 @@ server 在初始化期间发现兼容编译器，并对最近的 package、works
 编译器较旧时继续使用词法声明 fallback。
 folding 仍跟踪注释和字符串之外的配对大括号。
 
-仅当编译器报告 `call-references`、`method-references`、`type-references` 或
-`trait-references` capability 时才声明 `textDocument/definition`。它在完整的保存文件或版本匹配的
-overlay 快照中通过不透明 Symbol ID 解析直接函数、用户 trait method、类型语法名称和
-impl/bound trait 名称；构造器和字段引用尚未覆盖。
+仅当编译器报告 `call-references`、`method-references`、`type-references`、
+`trait-references`、`field-references` 或 `enum-variant-references` capability 时才声明
+`textDocument/definition`。它在完整的保存文件或版本匹配的 overlay 快照中，
+通过不透明 Symbol ID 解析直接函数、用户 trait method、类型语法名称、impl/bound
+trait 名称、struct 字段以及 enum 构造/match variant。
 hover、completion 和 rename 仍需编译器协议
 提供各自所需的更多语义记录，目前保持禁用。
 
