@@ -488,7 +488,18 @@ fn optional_real_compiler_combines_dirty_package_documents() {
                        "position": {"line": 4, "character": 18},
                        "context": {"includeDeclaration": false}}
         }),
-        json!({"jsonrpc": "2.0", "id": 7, "method": "shutdown", "params": null}),
+        json!({
+            "jsonrpc": "2.0", "id": 7, "method": "textDocument/prepareRename",
+            "params": {"textDocument": {"uri": main_uri},
+                       "position": {"line": 4, "character": 18}}
+        }),
+        json!({
+            "jsonrpc": "2.0", "id": 8, "method": "textDocument/rename",
+            "params": {"textDocument": {"uri": main_uri},
+                       "position": {"line": 4, "character": 18},
+                       "newName": "lunar_answer"}
+        }),
+        json!({"jsonrpc": "2.0", "id": 9, "method": "shutdown", "params": null}),
         json!({"jsonrpc": "2.0", "method": "exit", "params": null}),
     ] {
         input
@@ -507,6 +518,8 @@ fn optional_real_compiler_combines_dirty_package_documents() {
     assert!(messages.iter().any(|message| {
         message.get("id") == Some(&json!(1))
             && message.pointer("/result/capabilities/referencesProvider") == Some(&json!(true))
+            && message.pointer("/result/capabilities/renameProvider/prepareProvider")
+                == Some(&json!(true))
     }));
     for id in [2, 3] {
         assert!(messages.iter().any(|message| {
@@ -544,5 +557,29 @@ fn optional_real_compiler_combines_dirty_package_documents() {
                 .get("result")
                 .and_then(Value::as_array)
                 .is_some_and(|locations| locations.len() == 1 && locations[0]["uri"] == main_uri)
+    }));
+    assert!(messages.iter().any(|message| {
+        message.get("id") == Some(&json!(7))
+            && message.pointer("/result/placeholder") == Some(&json!("solar_answer"))
+    }));
+    assert!(messages.iter().any(|message| {
+        message.get("id") == Some(&json!(8))
+            && message
+                .pointer("/result/changes")
+                .and_then(Value::as_object)
+                .is_some_and(|changes| {
+                    changes
+                        .get(&api_uri)
+                        .and_then(Value::as_array)
+                        .is_some_and(|edits| {
+                            edits.len() == 1 && edits[0]["newText"] == "lunar_answer"
+                        })
+                        && changes
+                            .get(&main_uri)
+                            .and_then(Value::as_array)
+                            .is_some_and(|edits| {
+                                edits.len() == 1 && edits[0]["newText"] == "lunar_answer"
+                            })
+                })
     }));
 }

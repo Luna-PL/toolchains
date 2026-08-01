@@ -9,7 +9,7 @@ use luna_compiler::{
 use luna_protocol::{AnalysisRecord, Record, Span, SymbolKind};
 use luna_workspace::compiler_check_target;
 use serde_json::{Value, json};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, RecvTimeoutError};
@@ -95,6 +95,24 @@ impl Server {
                     .iter()
                     .any(|capability| capability == "package-references")
             });
+            let rename_provider = references_provider
+                && self.compiler.as_ref().is_some_and(|compiler| {
+                    compiler
+                        .identity
+                        .analysis_capabilities
+                        .iter()
+                        .any(|capability| {
+                            matches!(
+                                capability.as_str(),
+                                "call-references"
+                                    | "method-references"
+                                    | "type-references"
+                                    | "trait-references"
+                                    | "field-references"
+                                    | "enum-variant-references"
+                            )
+                        })
+                });
             return respond(
                 output,
                 id,
@@ -109,7 +127,10 @@ impl Server {
                         "documentSymbolProvider": true,
                         "foldingRangeProvider": true,
                         "definitionProvider": definition_provider,
-                        "referencesProvider": references_provider
+                        "referencesProvider": references_provider,
+                        "renameProvider": rename_provider.then_some(
+                            json!({"prepareProvider": true})
+                        )
                     },
                     "serverInfo": {"name": "luna-lsp", "version": "0.1.0"}
                 }),
@@ -167,6 +188,19 @@ impl Server {
             "textDocument/references" => {
                 if let Some(id) = id {
                     return respond(output, id, self.references(&parameters));
+                }
+            }
+            "textDocument/prepareRename" => {
+                if let Some(id) = id {
+                    return respond(output, id, self.prepare_rename(&parameters));
+                }
+            }
+            "textDocument/rename" => {
+                if let Some(id) = id {
+                    return match self.rename(&parameters) {
+                        Ok(edit) => respond(output, id, edit),
+                        Err(error) => respond_error(output, id, -32602, &error),
+                    };
                 }
             }
             "$/cancelRequest" | "workspace/didChangeConfiguration" => {}
@@ -619,6 +653,45 @@ impl Server {
             .unwrap_or_else(|| Value::Array(Vec::new()))
     }
 
+    fn prepare_rename(&self, parameters: &Value) -> Value {
+        let Some((document, byte)) = self.positioned_document(parameters) else {
+            return Value::Null;
+        };
+        self.analysis_records_for(document)
+            .and_then(|records| {
+                prepare_rename_from_analysis(records, &document.path, byte, &self.documents)
+            })
+            .unwrap_or(Value::Null)
+    }
+
+    fn rename(&self, parameters: &Value) -> Result<Value, String> {
+        let new_name = parameters
+            .get("newName")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "rename is missing newName".to_owned())?;
+        if !is_luna_identifier(new_name) {
+            return Err(format!("'{new_name}' is not a valid Luna identifier"));
+        }
+        let (document, byte) = self
+            .positioned_document(parameters)
+            .ok_or_else(|| "rename position is invalid or the document is not open".to_owned())?;
+        let records = self.analysis_records_for(document).ok_or_else(|| {
+            "rename requires a complete, version-matched package analysis snapshot".to_owned()
+        })?;
+        rename_from_analysis(records, &document.path, byte, new_name, &self.documents)
+            .ok_or_else(|| "the selected symbol is not renameable in Luna 0.2.x".to_owned())
+    }
+
+    fn positioned_document(&self, parameters: &Value) -> Option<(&Document, usize)> {
+        let uri = parameters
+            .pointer("/textDocument/uri")
+            .and_then(Value::as_str)?;
+        let document = self.documents.get(uri)?;
+        let position = parameters.get("position")?;
+        let byte = syntax::lsp_position_to_byte(&document.text, position).ok()?;
+        Some((document, byte))
+    }
+
     fn analysis_records_for(&self, document: &Document) -> Option<&[AnalysisRecord]> {
         let target = compiler_check_target(&document.path);
         let cache = self.analysis_by_target.get(&target)?;
@@ -749,6 +822,201 @@ fn references_from_analysis(
         (reference_target == target_id).then(|| analysis_location(source, documents))
     }));
     locations
+}
+
+fn prepare_rename_from_analysis(
+    records: &[AnalysisRecord],
+    source_path: &Path,
+    byte: usize,
+    documents: &HashMap<String, Document>,
+) -> Option<Value> {
+    let (symbol, occurrence) = rename_target_at(records, source_path, byte)?;
+    let AnalysisRecord::Symbol { name, .. } = symbol else {
+        return None;
+    };
+    Some(json!({
+        "range": lsp_range_for_documents(occurrence, documents),
+        "placeholder": name
+    }))
+}
+
+fn rename_from_analysis(
+    records: &[AnalysisRecord],
+    source_path: &Path,
+    byte: usize,
+    new_name: &str,
+    documents: &HashMap<String, Document>,
+) -> Option<Value> {
+    let (symbol, _) = rename_target_at(records, source_path, byte)?;
+    let AnalysisRecord::Symbol { id, selection, .. } = symbol else {
+        return None;
+    };
+    let mut spans = vec![selection];
+    spans.extend(records.iter().filter_map(|record| {
+        let AnalysisRecord::Reference {
+            target_id, source, ..
+        } = record
+        else {
+            return None;
+        };
+        (target_id == id).then_some(source)
+    }));
+    spans.sort_by(|left, right| {
+        left.path
+            .cmp(&right.path)
+            .then(left.start.byte.cmp(&right.start.byte))
+    });
+    spans.dedup_by(|left, right| {
+        left.path == right.path
+            && left.start.byte == right.start.byte
+            && left.end.byte == right.end.byte
+    });
+
+    let mut changes: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+    for span in spans {
+        changes
+            .entry(uri_for_path(&span.path, documents))
+            .or_default()
+            .push(json!({
+                "range": lsp_range_for_documents(span, documents),
+                "newText": new_name
+            }));
+    }
+    Some(json!({"changes": changes}))
+}
+
+fn rename_target_at<'a>(
+    records: &'a [AnalysisRecord],
+    source_path: &Path,
+    byte: usize,
+) -> Option<(&'a AnalysisRecord, &'a Span)> {
+    let target_id = symbol_id_at_analysis_position(records, source_path, byte)?;
+    let symbol = records
+        .iter()
+        .find(|record| matches!(record, AnalysisRecord::Symbol { id, .. } if id == target_id))?;
+    let AnalysisRecord::Symbol { symbol_kind, .. } = symbol else {
+        return None;
+    };
+    if !analysis_supports_rename(records, *symbol_kind) {
+        return None;
+    }
+    let expected = canonical_document_path(source_path);
+    let occurrence = records.iter().find_map(|record| match record {
+        AnalysisRecord::Reference {
+            target_id: reference_target,
+            source,
+            ..
+        } if reference_target == target_id && span_contains_byte(source, &expected, byte) => {
+            Some(source)
+        }
+        AnalysisRecord::Symbol { id, selection, .. }
+            if id == target_id && span_contains_byte(selection, &expected, byte) =>
+        {
+            Some(selection)
+        }
+        _ => None,
+    })?;
+    Some((symbol, occurrence))
+}
+
+fn analysis_supports_rename(records: &[AnalysisRecord], kind: SymbolKind) -> bool {
+    let Some(capabilities) = records.iter().find_map(|record| {
+        let AnalysisRecord::Hello { capabilities, .. } = record else {
+            return None;
+        };
+        Some(capabilities)
+    }) else {
+        return false;
+    };
+    let supports = |required: &str| capabilities.iter().any(|capability| capability == required);
+    if !supports("package-references") {
+        return false;
+    }
+    match kind {
+        SymbolKind::Function => supports("call-references"),
+        SymbolKind::Method => supports("method-references"),
+        SymbolKind::Struct => supports("type-references"),
+        SymbolKind::Enum => supports("type-references") && supports("enum-variant-references"),
+        SymbolKind::Trait => supports("trait-references"),
+        SymbolKind::Field => supports("field-references"),
+        SymbolKind::EnumVariant => supports("enum-variant-references"),
+        SymbolKind::Kernel
+        | SymbolKind::Fragment
+        | SymbolKind::Metadata
+        | SymbolKind::Constraint => false,
+    }
+}
+
+fn is_luna_identifier(name: &str) -> bool {
+    let mut bytes = name.bytes();
+    if !bytes
+        .next()
+        .is_some_and(|byte| byte.is_ascii_alphabetic() || byte == b'_')
+        || !bytes.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+    {
+        return false;
+    }
+    !matches!(
+        name,
+        "fn" | "let"
+            | "const"
+            | "constexpr"
+            | "fragment"
+            | "slot"
+            | "interceptor"
+            | "context"
+            | "many"
+            | "resume"
+            | "apply"
+            | "abort"
+            | "default"
+            | "meta"
+            | "constraint"
+            | "select"
+            | "with"
+            | "runtime"
+            | "dynamic"
+            | "nominal"
+            | "kernel"
+            | "launch"
+            | "await"
+            | "new"
+            | "move"
+            | "rc"
+            | "arc"
+            | "borrow"
+            | "affine"
+            | "linear"
+            | "mut"
+            | "free"
+            | "extern"
+            | "auto"
+            | "return"
+            | "trait"
+            | "impl"
+            | "where"
+            | "struct"
+            | "enum"
+            | "package"
+            | "module"
+            | "using"
+            | "as"
+            | "export"
+            | "if"
+            | "else"
+            | "match"
+            | "while"
+            | "for"
+            | "true"
+            | "false"
+            | "Self"
+            | "i32"
+            | "i64"
+            | "f32"
+            | "f64"
+            | "bool"
+            | "string"
+    )
 }
 
 fn symbol_id_at_analysis_position<'a>(
@@ -1206,5 +1474,88 @@ mod tests {
             from_reference[0].pointer("/range/start/character"),
             Some(&json!(3))
         );
+    }
+
+    #[test]
+    fn compiler_rename_edits_declaration_and_references() {
+        let records = luna_protocol::parse_analysis_jsonl(include_str!(
+            "../../../tests/protocol/analysis_v1.jsonl"
+        ))
+        .expect("analysis golden stream must parse");
+        let prepared = prepare_rename_from_analysis(
+            &records,
+            Path::new("/workspace/main.luna"),
+            59,
+            &HashMap::new(),
+        )
+        .expect("direct function must be renameable");
+        assert_eq!(prepared["placeholder"], "add");
+        assert_eq!(prepared.pointer("/range/start/line"), Some(&json!(2)));
+
+        let edit = rename_from_analysis(
+            &records,
+            Path::new("/workspace/main.luna"),
+            4,
+            "sum",
+            &HashMap::new(),
+        )
+        .expect("declaration must produce a workspace edit");
+        let edits = edit["changes"]
+            .get("file:///workspace/main.luna")
+            .and_then(Value::as_array)
+            .expect("workspace edit must group changes by URI");
+        assert_eq!(edits.len(), 2);
+        assert!(edits.iter().all(|entry| entry["newText"] == "sum"));
+    }
+
+    #[test]
+    fn member_rename_is_capability_gated() {
+        let mut records = luna_protocol::parse_analysis_jsonl(include_str!(
+            "../../../tests/protocol/analysis_v1.jsonl"
+        ))
+        .expect("analysis golden stream must parse");
+        if let AnalysisRecord::Hello { capabilities, .. } = &mut records[0] {
+            capabilities.push("field-references".to_owned());
+        }
+        if let AnalysisRecord::Symbol {
+            name, symbol_kind, ..
+        } = &mut records[1]
+        {
+            *name = "value".to_owned();
+            *symbol_kind = SymbolKind::Field;
+        }
+        assert!(
+            rename_from_analysis(
+                &records,
+                Path::new("/workspace/main.luna"),
+                4,
+                "amount",
+                &HashMap::new(),
+            )
+            .is_some()
+        );
+
+        if let AnalysisRecord::Symbol { symbol_kind, .. } = &mut records[1] {
+            *symbol_kind = SymbolKind::Metadata;
+        }
+        assert!(
+            rename_from_analysis(
+                &records,
+                Path::new("/workspace/main.luna"),
+                4,
+                "Schema",
+                &HashMap::new(),
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn rename_name_validation_matches_the_alpha_lexer() {
+        assert!(is_luna_identifier("new_name2"));
+        assert!(!is_luna_identifier("2bad"));
+        assert!(!is_luna_identifier("moon-name"));
+        assert!(!is_luna_identifier("struct"));
+        assert!(!is_luna_identifier("月"));
     }
 }

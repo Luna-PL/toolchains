@@ -44,9 +44,17 @@ aid that tracks balanced braces outside comments and strings.
 capability. It resolves direct functions, user trait methods, type-syntax
 names, impl/bound trait names, struct fields, and enum construction/match
 variants by opaque Symbol ID in a complete saved-file or version-matched
-overlay snapshot. Hover,
-completion, and rename remain disabled until the compiler protocol exposes the
-additional semantic records each operation requires.
+overlay snapshot.
+
+`textDocument/prepareRename` and `textDocument/rename` provide a deliberately
+small Luna 0.2.x package rename. They are enabled only with
+`package-references` and the symbol's explicit reference capability, and edit
+the declaration plus all matching Symbol ID references in the current complete
+snapshot. Function, method, struct, enum, trait, field, and enum-variant symbols
+are supported. Locals, parameters, metadata, constraints, kernels, fragments,
+anonymous-record fields, file renames, collision prediction, and persistent
+cross-package indexing are outside this compatibility implementation. Hover
+and completion remain disabled.
 
 `textDocument/references` is advertised only with `package-references`. A
 request may start on a declaration or any emitted reference and returns all

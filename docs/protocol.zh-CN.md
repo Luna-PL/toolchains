@@ -112,6 +112,7 @@ trait method 调用；`type-references` 覆盖类型语法中已解析的用户�
 Rust wire type 和序列校验已经在 `luna-protocol` 中实现；配套编译器生产端及按
 capability 开关的 `luna-compiler` 客户端也已实现。完整保存文件快照具备任一已广告的
 reference capability 时已经启用 definition，版本匹配的完整 overlay 快照具有相同语义。
-只有具备 `package-references` 时才启用 package 范围的 `textDocument/references`。hover、
-completion、rename 和更广的 workspace 索引必须使用后续显式 capability，不能从 MoonIR 名字或
-渲染诊断中推断。
+只有具备 `package-references` 时才启用 package 范围的 `textDocument/references`。
+0.2.x language server 使用 `package-references` 与所选符号的显式引用类 capability 派生有限的
+package rename，不声称支持局部或跨 package rename。hover、completion 和更广的 workspace
+索引必须使用后续显式 capability，不能从 MoonIR 名字或渲染诊断中推断。

@@ -133,6 +133,9 @@ The Rust wire types and sequence validator are implemented in
 saved-file snapshots with
 any advertised reference capability; a complete version-matched overlay
 snapshot has the same semantics. Package-scoped `textDocument/references` is
-enabled only with `package-references`. Hover, completion, rename, and broader
-workspace indexing require future explicit capabilities and must not be
-inferred from MoonIR names or rendered diagnostics.
+enabled only with `package-references`. The 0.2.x language server derives its
+limited package rename from `package-references` plus the selected symbol's
+explicit reference-class capability; it does not claim local or cross-package
+rename. Hover, completion, and broader workspace indexing require future
+explicit capabilities and must not be inferred from MoonIR names or rendered
+diagnostics.

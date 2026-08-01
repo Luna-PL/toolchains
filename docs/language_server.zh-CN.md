@@ -36,8 +36,13 @@ folding 仍跟踪注释和字符串之外的配对大括号。
 `textDocument/definition`。它在完整的保存文件或版本匹配的 overlay 快照中，
 通过不透明 Symbol ID 解析直接函数、用户 trait method、类型语法名称、impl/bound
 trait 名称、struct 字段以及 enum 构造/match variant。
-hover、completion 和 rename 仍需编译器协议
-提供各自所需的更多语义记录，目前保持禁用。
+
+`textDocument/prepareRename` 和 `textDocument/rename` 提供有意收紧的 Luna 0.2.x
+package rename。只有同时具备 `package-references` 和该符号对应引用 capability 时才启用，
+并且只编辑当前完整快照中的声明及相同 Symbol ID 引用。支持 function、method、struct、
+enum、trait、field 和 enum variant。局部变量、参数、metadata、constraint、kernel、fragment、
+匿名 record 字段、文件改名、冲突预测和持久化跨 package 索引不在这个兼容实现内。
+hover 和 completion 仍保持禁用。
 
 仅当编译器报告 `package-references` 时才声明 `textDocument/references`。请求可以从声明或
 任意已输出引用位置发起，并返回当前完整 package 快照中的所有匹配位置；它遵守
