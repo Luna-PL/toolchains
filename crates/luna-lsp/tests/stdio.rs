@@ -1,3 +1,4 @@
+use luna_compiler::{CandidateSource, probe};
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Cursor, Read, Write};
 use std::path::Path;
@@ -375,6 +376,23 @@ fn optional_real_compiler_combines_dirty_package_documents() {
     let Some(luna_bin) = std::env::var_os("LUNA_BIN") else {
         return;
     };
+    let compiler = probe(Path::new(&luna_bin), CandidateSource::Explicit)
+        .expect("LUNA_BIN must implement the diagnostic protocol");
+    if ![
+        "multi-document-overlay",
+        "package-references",
+        "call-references",
+    ]
+    .iter()
+    .all(|expected| {
+        compiler
+            .identity
+            .analysis_capabilities
+            .iter()
+            .any(|available| available == expected)
+    }) {
+        return;
+    }
     let mut child = Command::new(env!("CARGO_BIN_EXE_luna-lsp"))
         .env("LUNA_BIN", &luna_bin)
         .stdin(Stdio::piped())
