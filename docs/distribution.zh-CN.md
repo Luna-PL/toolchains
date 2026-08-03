@@ -8,6 +8,10 @@ push 已存在的版本 tag（例如 `v0.1.1`）会运行 release workflow；手
 输入已存在 tag。tag 必须与 Cargo workspace、VS Code extension、Tree-sitter grammar
 和兼容性 manifest 中的版本一致。
 
+打包开始前，release workflow 会对 `compatibility/luna.json` 声明的精确 Luna release
+tag 复用完整 Toolchain CI。三个目标平台 job 与强制真实编译器集成 job 必须全部通过；
+发布不能与该兼容门禁并行执行，也不能绕过它。
+
 每个 Release 包含：
 
 - `luna-toolchain-<version>-linux-x86_64.tar.gz`

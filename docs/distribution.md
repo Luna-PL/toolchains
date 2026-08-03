@@ -9,6 +9,11 @@ A manual run accepts an existing tag as input. The tag must match the Cargo
 workspace, VS Code extension, Tree-sitter grammar, and compatibility-manifest
 versions.
 
+Before packaging starts, the release workflow reuses the complete Toolchain CI against the
+exact Luna release tag declared by `compatibility/luna.json`. All three platform jobs and the
+mandatory real-compiler integration job must pass; publication cannot run in parallel with or
+bypass that compatibility gate.
+
 Each release contains:
 
 - `luna-toolchain-<version>-linux-x86_64.tar.gz`

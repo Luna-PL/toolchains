@@ -9,6 +9,17 @@ on:
         description: Luna branch, tag, or commit used for conformance and integration
         required: false
         default: main
+  workflow_call:
+    inputs:
+      luna_ref:
+        description: Luna branch, tag, or commit used for conformance and integration
+        required: false
+        default: main
+        type: string
+      toolchain_ref:
+        description: LunaToolchain branch, tag, or commit to validate
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -43,6 +54,8 @@ jobs:
     steps:
       - name: Check out LunaToolchain
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.toolchain_ref || github.ref }}
 
       - name: Check out compatible Luna fixtures
         uses: actions/checkout@v6
@@ -118,6 +131,8 @@ jobs:
     steps:
       - name: Check out LunaToolchain
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.toolchain_ref || github.ref }}
 
       - name: Check out the selected Luna source
         uses: actions/checkout@v6

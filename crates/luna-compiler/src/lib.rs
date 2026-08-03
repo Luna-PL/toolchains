@@ -731,6 +731,14 @@ mod tests {
             .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.."))
     }
 
+    fn has_analysis_capability(compiler: &Compiler, expected: &str) -> bool {
+        compiler
+            .identity
+            .analysis_capabilities
+            .iter()
+            .any(|capability| capability == expected)
+    }
+
     #[test]
     fn explicit_candidate_has_priority() {
         let selected_sources = RefCell::new(Vec::new());
@@ -823,37 +831,58 @@ mod tests {
         };
         let compiler = probe(Path::new(&path), CandidateSource::Explicit)
             .expect("LUNA_BIN must implement the diagnostic protocol");
-        assert!(!compiler.identity.language_version.is_empty());
-        assert_eq!(compiler.identity.diagnostic_protocol_version, 1);
-        assert_eq!(compiler.identity.analysis_protocol_version, Some(1));
-        assert!(
-            compiler
-                .identity
-                .analysis_capabilities
-                .iter()
-                .any(|capability| capability == "declarations")
+        let compatibility: serde_json::Value =
+            serde_json::from_str(include_str!("../../../compatibility/luna.json"))
+                .expect("compatibility manifest must be valid JSON");
+        let luna = &compatibility["luna"];
+        assert_eq!(
+            compiler.identity.language_version,
+            luna["language_version"]
+                .as_str()
+                .expect("language version must be a string")
         );
-        assert!(
-            compiler
-                .identity
-                .analysis_capabilities
-                .iter()
-                .any(|capability| capability == "single-document-overlay")
+        assert_eq!(
+            u64::from(compiler.identity.diagnostic_protocol_version),
+            luna["diagnostic_protocol"]
+                .as_u64()
+                .expect("diagnostic protocol must be an integer")
         );
-        assert!(
-            compiler
-                .identity
-                .analysis_capabilities
-                .iter()
-                .any(|capability| capability == "multi-document-overlay")
+        assert_eq!(
+            compiler.identity.analysis_protocol_version.map(u64::from),
+            Some(
+                luna["analysis_protocol"]
+                    .as_u64()
+                    .expect("analysis protocol must be an integer")
+            )
         );
-        assert!(
-            compiler
-                .identity
-                .analysis_capabilities
-                .iter()
-                .any(|capability| capability == "package-references")
-        );
+        for capability in luna["required_diagnostic_capabilities"]
+            .as_array()
+            .expect("required diagnostic capabilities must be an array")
+        {
+            let capability = capability
+                .as_str()
+                .expect("diagnostic capability must be a string");
+            assert!(
+                compiler
+                    .identity
+                    .capabilities
+                    .iter()
+                    .any(|available| available == capability),
+                "compiler is missing required diagnostic capability {capability}"
+            );
+        }
+        for capability in luna["required_analysis_capabilities"]
+            .as_array()
+            .expect("required analysis capabilities must be an array")
+        {
+            let capability = capability
+                .as_str()
+                .expect("analysis capability must be a string");
+            assert!(
+                has_analysis_capability(&compiler, capability),
+                "compiler is missing required analysis capability {capability}"
+            );
+        }
 
         let source = luna_source_root().join("examples/minimal.luna");
         let report =
@@ -874,49 +903,57 @@ mod tests {
             })
         ));
 
-        let overlaid = analyze_overlay(
-            &compiler,
-            &source,
-            &source,
-            "// 月\nfn unsaved() -> i32 { return 5; }\nfn main() -> i32 { return unsaved(); }\n",
-        )
-        .expect("LUNA_BIN must analyze an in-memory source overlay");
-        assert!(overlaid.records.iter().any(|record| matches!(
-            record,
-            AnalysisRecord::Symbol { name, .. } if name == "unsaved"
-        )));
-        assert!(
-            overlaid
-                .records
-                .iter()
-                .any(|record| matches!(record, AnalysisRecord::Reference { .. }))
-        );
+        if has_analysis_capability(&compiler, "single-document-overlay") {
+            let overlaid = analyze_overlay(
+                &compiler,
+                &source,
+                &source,
+                "// 月\nfn unsaved() -> i32 { return 5; }\nfn main() -> i32 { return unsaved(); }\n",
+            )
+            .expect("advertised single-document overlay capability must work");
+            assert!(overlaid.records.iter().any(|record| matches!(
+                record,
+                AnalysisRecord::Symbol { name, .. } if name == "unsaved"
+            )));
+            if has_analysis_capability(&compiler, "call-references") {
+                assert!(
+                    overlaid
+                        .records
+                        .iter()
+                        .any(|record| matches!(record, AnalysisRecord::Reference { .. }))
+                );
+            }
+        }
 
-        let package = luna_source_root().join("tests/fixtures/packages/module_headers");
-        let multi_overlaid = analyze_overlays(
-            &compiler,
-            &package,
-            &[
-                AnalysisOverlay {
-                    path: package.join("01_math.luna"),
-                    text: "package org.luna.module_headers;\nmodule math::integer;\nusing org.luna.std as std;\n// 月\nexport fn moon_answer() -> i32 { return 42; }\n".to_owned(),
-                },
-                AnalysisOverlay {
-                    path: package.join("02_main.luna"),
-                    text: "package org.luna.module_headers;\nmodule application;\nusing org.luna.std as std;\nfn main() -> i32 { return math::integer::moon_answer(); }\n".to_owned(),
-                },
-            ],
-        )
-        .expect("LUNA_BIN must analyze multiple in-memory source overlays");
-        assert!(multi_overlaid.records.iter().any(|record| matches!(
-            record,
-            AnalysisRecord::Symbol { name, .. } if name == "moon_answer"
-        )));
-        assert!(
-            multi_overlaid
-                .records
-                .iter()
-                .any(|record| matches!(record, AnalysisRecord::Reference { .. }))
-        );
+        if has_analysis_capability(&compiler, "multi-document-overlay") {
+            let package = luna_source_root().join("tests/fixtures/packages/module_headers");
+            let multi_overlaid = analyze_overlays(
+                &compiler,
+                &package,
+                &[
+                    AnalysisOverlay {
+                        path: package.join("01_math.luna"),
+                        text: "package org.luna.module_headers;\nmodule math::integer;\nusing org.luna.std as std;\n// 月\nexport fn moon_answer() -> i32 { return 42; }\n".to_owned(),
+                    },
+                    AnalysisOverlay {
+                        path: package.join("02_main.luna"),
+                        text: "package org.luna.module_headers;\nmodule application;\nusing org.luna.std as std;\nfn main() -> i32 { return math::integer::moon_answer(); }\n".to_owned(),
+                    },
+                ],
+            )
+            .expect("advertised multi-document overlay capability must work");
+            assert!(multi_overlaid.records.iter().any(|record| matches!(
+                record,
+                AnalysisRecord::Symbol { name, .. } if name == "moon_answer"
+            )));
+            if has_analysis_capability(&compiler, "call-references") {
+                assert!(
+                    multi_overlaid
+                        .records
+                        .iter()
+                        .any(|record| matches!(record, AnalysisRecord::Reference { .. }))
+                );
+            }
+        }
     }
 }

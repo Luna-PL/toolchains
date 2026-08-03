@@ -19,8 +19,49 @@ env:
   RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
 
 jobs:
+  release-metadata:
+    name: Verify release metadata
+    runs-on: ubuntu-24.04
+    outputs:
+      luna_ref: ${{ steps.metadata.outputs.luna_ref }}
+      release_tag: ${{ steps.metadata.outputs.release_tag }}
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          persist-credentials: false
+
+      - name: Install Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Verify release versions
+        run: node scripts/release/verify-version.js
+
+      - name: Read compatibility baseline
+        id: metadata
+        shell: bash
+        run: |
+          luna_ref="$(node -p "require('./compatibility/luna.json').luna.release_tag")"
+          test -n "$luna_ref"
+          echo "luna_ref=$luna_ref" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+  conformance:
+    name: Release conformance
+    needs: release-metadata
+    uses: ./.github/workflows/ci.yml
+    with:
+      luna_ref: ${{ needs.release-metadata.outputs.luna_ref }}
+      toolchain_ref: ${{ needs.release-metadata.outputs.release_tag }}
+
   package:
     name: ${{ matrix.name }}
+    needs:
+      - release-metadata
+      - conformance
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
