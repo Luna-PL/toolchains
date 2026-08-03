@@ -725,6 +725,12 @@ mod tests {
         path
     }
 
+    fn luna_source_root() -> PathBuf {
+        env::var_os("LUNA_SOURCE_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.."))
+    }
+
     #[test]
     fn explicit_candidate_has_priority() {
         let selected_sources = RefCell::new(Vec::new());
@@ -849,7 +855,7 @@ mod tests {
                 .any(|capability| capability == "package-references")
         );
 
-        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/minimal.luna");
+        let source = luna_source_root().join("examples/minimal.luna");
         let report =
             check_saved(&compiler, &source).expect("LUNA_BIN must check a saved standalone source");
         assert!(matches!(
@@ -886,8 +892,7 @@ mod tests {
                 .any(|record| matches!(record, AnalysisRecord::Reference { .. }))
         );
 
-        let package = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../tests/fixtures/packages/module_headers");
+        let package = luna_source_root().join("tests/fixtures/packages/module_headers");
         let multi_overlaid = analyze_overlays(
             &compiler,
             &package,
