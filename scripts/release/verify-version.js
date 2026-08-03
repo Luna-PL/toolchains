@@ -14,6 +14,9 @@ const cargoVersion = cargo.match(
 const extension = JSON.parse(
   readFileSync(join(root, "editors", "vscode", "package.json"), "utf8"),
 );
+const grammar = JSON.parse(
+  readFileSync(join(root, "grammars", "tree-sitter-luna", "package.json"), "utf8"),
+);
 const compatibility = JSON.parse(
   readFileSync(join(root, "compatibility", "luna.json"), "utf8"),
 );
@@ -22,6 +25,7 @@ const expected = releaseTag.slice(1);
 for (const [owner, version] of [
   ["Cargo workspace", cargoVersion],
   ["VS Code extension", extension.version],
+  ["Tree-sitter grammar", grammar.version],
   ["compatibility manifest", compatibility.toolchain_version],
 ]) {
   if (version !== expected) {

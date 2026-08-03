@@ -3,7 +3,7 @@
 [English](README.md) | [简体中文](README.zh-CN.md)
 
 LunaToolchain is the independent editor and developer-tooling workspace for
-Luna `0.2.0-alpha`. It lives beside the compiler during local development but
+Luna `0.2.1`. It lives beside the compiler during local development but
 has its own Git history, releases, compatibility policy, and version number.
 
 Current status: M4 semantic tooling in progress. `luna-protocol` validates
@@ -51,9 +51,10 @@ capabilities independently.
 checks on Ubuntu 24.04, macOS 15, and Windows Server 2022. Grammar conformance
 tracks `Luna-PL/Luna:main` during normal push and pull-request runs so language
 drift is detected early. A manual run can override this with any Luna branch,
-tag, or commit. Release compatibility will be pinned separately to a Luna
-release tag. Tests that launch a real Luna compiler remain optional until CI
-consumes compatible prebuilt compiler packages.
+tag, or commit. A dedicated Linux job builds that exact ref and makes the
+compiler-backed protocol, formatter-corpus, definition, reference, rename, and
+multi-document overlay tests mandatory. Published compatibility remains pinned
+separately to a Luna release tag.
 
 ## Releases
 

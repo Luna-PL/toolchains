@@ -45,8 +45,8 @@ editor-host 证据。
 ## M4：语义编辑能力
 
 状态：进行中；声明协议 v1 的 wire type、校验、编译器生产端及客户端已经实现，LSP
-已接入保存文件 document symbol、直接函数、trait method、类型语法与 trait definition，
-以及带版本向量快照校验的单/多文档脏 buffer overlay；构造器/字段引用仍待完成。
+已接入保存文件 document symbol、直接函数、trait method、类型语法、trait、struct 字段
+与 enum variant definition，以及带版本向量快照校验的单/多文档脏 buffer overlay。
 package 范围的 `textDocument/references` 和有意限制的 0.2.x package rename 已实现；
 局部 rename 与持久化多 package 索引留到 0.3 语法基线之后。
 

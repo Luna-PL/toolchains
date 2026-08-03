@@ -74,5 +74,5 @@ diagnostics remain pending a structured diagnostic-overlay capability.
 - `Luna: Restart Language Server`: stop and recreate the client after changes.
 
 The extension requires VS Code 1.91 or later and uses
-`vscode-languageclient` 10.1.0. M2 still requires editor-host and
-Linux/macOS/Windows CI evidence before release status.
+`vscode-languageclient` 10.1.0. Process-level Linux/macOS/Windows CI is in
+place; editor-host evidence remains before release status.

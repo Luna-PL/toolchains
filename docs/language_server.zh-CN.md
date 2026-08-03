@@ -58,5 +58,5 @@ diagnostic-overlay capability。
 - `luna.compiler.path`：可选的精确编译器路径；
 - `Luna: Restart Language Server`：修改配置后停止并重新创建 client。
 
-扩展要求 VS Code 1.91 或更高版本，并使用 `vscode-languageclient` 10.1.0。M2 在发布
-前仍需 editor host 以及 Linux/macOS/Windows CI 证据。
+扩展要求 VS Code 1.91 或更高版本，并使用 `vscode-languageclient` 10.1.0。已有
+Linux/macOS/Windows process-level CI；发布状态前仍需 editor host 证据。

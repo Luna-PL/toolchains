@@ -21,7 +21,7 @@
 
 `hello` 必须携带语言版本、编译器源码 commit、构建 target、诊断协议名称/版本和
 可选 capability。客户端必须在解释诊断前拒绝不支持的主版本。由于 Luna 长期保持
-`0.2.0-alpha`，compiler commit 仍是必要身份。
+`0.2.1`，compiler commit 仍是必要身份。
 
 ## 诊断记录
 

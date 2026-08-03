@@ -704,7 +704,7 @@ mod tests {
             executable: path.to_path_buf(),
             source,
             identity: CompilerIdentity {
-                language_version: "0.2.0-alpha".to_owned(),
+                language_version: "0.2.1".to_owned(),
                 compiler_commit: "test".to_owned(),
                 build_target: "test-target".to_owned(),
                 diagnostic_protocol_version: 1,
@@ -802,7 +802,7 @@ mod tests {
         let compiler = identity_from_outputs(
             Path::new("luna"),
             CandidateSource::Explicit,
-            "0.2.0-alpha",
+            "0.2.1",
             GOLDEN,
         )
         .expect("golden identity must be accepted");

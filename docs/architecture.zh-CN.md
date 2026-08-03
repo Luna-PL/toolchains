@@ -50,7 +50,7 @@ folding 暂时仍使用 language server 的保守 scanner，后续仅在有明�
 ## 兼容性
 
 语言版本、编译器构建身份、诊断协议、分析协议、LSP 版本和编辑器扩展版本是不同
-身份。Luna 长期保持 `0.2.0-alpha` 时仍须显式暴露协议不兼容；客户端按协议版本和
+身份。Luna 长期保持 `0.2.1` maintenance line 时仍须显式暴露协议不兼容；客户端按协议版本和
 compiler commit 决定是否启用功能。
 
 三平台开发 CI 跟踪 Luna 默认分支的源码 fixture，以立即暴露语言漂移；手动运行可

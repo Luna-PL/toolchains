@@ -5,7 +5,7 @@ use std::path::PathBuf;
 fn main() {
     let mut arguments = env::args_os().skip(1);
     let Some(command) = arguments.next() else {
-        println!("LunaToolchain 0.1.0");
+        println!("LunaToolchain 0.1.1");
         return;
     };
     if command != "compiler" {

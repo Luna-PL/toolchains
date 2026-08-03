@@ -58,7 +58,7 @@ own measured benefit and compatibility tests.
 
 The language version, compiler build identity, diagnostic protocol, analysis
 protocol, LSP release, and editor-extension release are separate identities.
-Luna remaining at `0.2.0-alpha` must not hide protocol incompatibility; clients
+Luna remaining on the `0.2.1` maintenance line must not hide protocol incompatibility; clients
 gate features on explicit protocol versions and compiler commit metadata.
 
 The three-platform development CI follows the Luna default branch for source

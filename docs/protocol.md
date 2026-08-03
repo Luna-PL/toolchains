@@ -22,7 +22,7 @@ Human output and JSONL must never be mixed on the protocol stream. Exit status
 
 The `hello` record carries:
 
-- language version (`0.2.0-alpha`);
+- language version (`0.2.1`);
 - compiler source commit and build target;
 - diagnostic protocol name/version;
 - supported optional capabilities.

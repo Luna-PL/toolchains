@@ -2,7 +2,7 @@
   "name": "luna-language",
   "displayName": "Luna Language Support (Alpha)",
   "description": "Luna highlighting, formatting, saved-file diagnostics, symbols, and folding.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "publisher": "luna-pl",
   "license": "MIT OR Apache-2.0",

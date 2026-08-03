@@ -4,9 +4,9 @@
 
 > 状态：三平台 archive 与 VSIX 打包已实现
 
-push 已存在的版本 tag（例如 `v0.1.0`）会运行 release workflow；手动运行时也必须
-输入已存在 tag。tag 必须与 Cargo workspace、VS Code extension 和兼容性 manifest
-中的版本一致。
+push 已存在的版本 tag（例如 `v0.1.1`）会运行 release workflow；手动运行时也必须
+输入已存在 tag。tag 必须与 Cargo workspace、VS Code extension、Tree-sitter grammar
+和兼容性 manifest 中的版本一致。
 
 每个 Release 包含：
 

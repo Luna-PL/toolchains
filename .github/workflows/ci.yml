@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       luna_ref:
-        description: Luna branch, tag, or commit used for grammar conformance
+        description: Luna branch, tag, or commit used for conformance and integration
         required: false
         default: main
 
@@ -109,3 +109,55 @@ jobs:
 
       - name: Smoke-test VSIX packaging
         run: npm --prefix editors/vscode run package:vsix -- --target ${{ matrix.vscode-target }} --out ../../luna-language-ci-${{ matrix.vscode-target }}.vsix
+
+  compiler-integration:
+    name: Luna compiler integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out LunaToolchain
+        uses: actions/checkout@v6
+
+      - name: Check out the selected Luna source
+        uses: actions/checkout@v6
+        with:
+          repository: Luna-PL/Luna
+          ref: ${{ env.LUNA_FIXTURE_REF }}
+          path: .ci/luna
+          persist-credentials: false
+
+      - name: Install CMake, Ninja, and LLVM 22
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates cmake curl lsb-release ninja-build wget
+          wget -q https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 22 all
+
+      - name: Install Rust 1.89
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Build the selected Luna compiler
+        run: |
+          cmake -S .ci/luna -B .ci/luna-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_COMPILER=clang-22 \
+            -DCMAKE_CXX_COMPILER=clang++-22 \
+            -DLUNA_STRICT_WARNINGS=ON \
+            -DLLVM_DIR=/usr/lib/llvm-22/lib/cmake/llvm
+          cmake --build .ci/luna-build --parallel
+
+      - name: Verify compiler build identity
+        run: ctest --test-dir .ci/luna-build -R '^luna.compiler-identity$' --output-on-failure
+
+      - name: Run mandatory compiler-backed toolchain tests
+        run: cargo test --workspace --locked
+        env:
+          LUNA_BIN: ${{ github.workspace }}/.ci/luna-build/luna
+          LUNA_SOURCE_DIR: ${{ github.workspace }}/.ci/luna
+
+      - name: Report selected compiler capabilities
+        run: cargo run --locked -p luna-tools -- compiler --luna "${LUNA_BIN}"
+        env:
+          LUNA_BIN: ${{ github.workspace }}/.ci/luna-build/luna
