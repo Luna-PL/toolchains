@@ -1,0 +1,117 @@
+name: Published release verification
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing toolchain release tag to verify
+        required: true
+        default: v0.1.1
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: published-toolchain-${{ inputs.tag || github.event.release.tag_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  verify:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64 consumer
+            runner: ubuntu-24.04
+            platform: linux-x86_64
+            vsix-target: linux-x64
+            archive-kind: tar.gz
+          - name: macOS arm64 consumer
+            runner: macos-15
+            platform: macos-arm64
+            vsix-target: darwin-arm64
+            archive-kind: tar.gz
+          - name: Windows x86_64 consumer
+            runner: windows-2022
+            platform: windows-x86_64
+            vsix-target: win32-x64
+            archive-kind: zip
+
+    steps:
+      - name: Check out verification scripts
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Install Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Resolve release asset names
+        id: assets
+        shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          VSIX_TARGET: ${{ matrix.vsix-target }}
+          ARCHIVE_KIND: ${{ matrix.archive-kind }}
+        run: |
+          version="${RELEASE_TAG#v}"
+          echo "archive=luna-toolchain-${version}-${PLATFORM}.${ARCHIVE_KIND}" >> "$GITHUB_OUTPUT"
+          echo "package=luna-toolchain-${version}-${PLATFORM}" >> "$GITHUB_OUTPUT"
+          echo "vsix=luna-language-${RELEASE_TAG}-${VSIX_TARGET}.vsix" >> "$GITHUB_OUTPUT"
+
+      - name: Download published assets
+        shell: bash
+        env:
+          ARCHIVE_NAME: ${{ steps.assets.outputs.archive }}
+          VSIX_NAME: ${{ steps.assets.outputs.vsix }}
+        run: |
+          mkdir -p published
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir published \
+            --pattern SHA256SUMS \
+            --pattern "$ARCHIVE_NAME" \
+            --pattern "$VSIX_NAME"
+
+      - name: Verify published checksums and manifest completeness
+        env:
+          ARCHIVE_NAME: ${{ steps.assets.outputs.archive }}
+          VSIX_NAME: ${{ steps.assets.outputs.vsix }}
+        run: node scripts/release/verify-published-assets.js published "${{ env.RELEASE_TAG }}" "${{ env.ARCHIVE_NAME }}" "${{ env.VSIX_NAME }}"
+
+      - name: Extract Unix archive
+        if: matrix.archive-kind == 'tar.gz'
+        shell: bash
+        env:
+          ARCHIVE_NAME: ${{ steps.assets.outputs.archive }}
+        run: |
+          mkdir -p extracted
+          tar -xzf "published/$ARCHIVE_NAME" -C extracted
+
+      - name: Extract Windows archive
+        if: matrix.archive-kind == 'zip'
+        shell: pwsh
+        env:
+          ARCHIVE_NAME: ${{ steps.assets.outputs.archive }}
+        run: |
+          New-Item -ItemType Directory -Force -Path extracted
+          Expand-Archive -LiteralPath "published/$env:ARCHIVE_NAME" -DestinationPath extracted
+
+      - name: Run installed command-line tools and LSP
+        env:
+          PACKAGE_NAME: ${{ steps.assets.outputs.package }}
+        run: node scripts/release/verify-installed-tools.js "extracted/${{ env.PACKAGE_NAME }}" "${{ env.RELEASE_TAG }}"

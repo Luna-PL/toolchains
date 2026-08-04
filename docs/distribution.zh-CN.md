@@ -44,3 +44,7 @@ binary，再 fallback 到 `PATH`。编译器诊断仍要求单独安装兼容的
 
 Release 兼容性由 `compatibility/luna.json` 声明，固定发布 package 支持的 Luna
 release tag、语言版本和诊断协议。开发 CI 则独立跟踪 Luna `main` 以发现漂移。
+
+发布后，`published-release.yml` 会在干净的 Linux、macOS 与 Windows runner 上下载不可变
+GitHub Release。每个 job 都会验证完整 `SHA256SUMS` manifest、本平台 archive 和 VSIX，
+解包后启动 `luna-tools`、`luna-fmt` 与 `luna-lsp`，并检查随包分发的兼容性 manifest。

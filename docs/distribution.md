@@ -49,3 +49,8 @@ separately or configured with `luna.compiler.path`/`LUNA_BIN`.
 Release compatibility is declarative: `compatibility/luna.json` pins the Luna
 release tag, language version, and diagnostic protocol supported by published
 packages. Development CI follows Luna `main` independently to detect drift.
+
+After publication, `published-release.yml` downloads the immutable GitHub Release on clean
+Linux, macOS, and Windows runners. Each job verifies the complete `SHA256SUMS` manifest and
+its platform archive and VSIX, extracts the archive, starts `luna-tools`, `luna-fmt`, and
+`luna-lsp`, and checks the packaged compatibility manifest.
