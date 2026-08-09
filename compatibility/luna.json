@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "toolchain_version": "0.1.1",
+  "toolchain_version": "0.1.2",
   "luna": {
     "language_version": "0.2.1",
     "release_tag": "v0.2.1",

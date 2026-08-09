@@ -4,7 +4,7 @@
 
 > 状态：三平台 archive 与 VSIX 打包已实现
 
-push 已存在的版本 tag（例如 `v0.1.1`）会运行 release workflow；手动运行时也必须
+push 已存在的版本 tag（例如 `v0.1.2`）会运行 release workflow；手动运行时也必须
 输入已存在 tag。tag 必须与 Cargo workspace、VS Code extension、Tree-sitter grammar
 和兼容性 manifest 中的版本一致。
 
@@ -47,4 +47,5 @@ release tag、语言版本和诊断协议。开发 CI 则独立跟踪 Luna `main
 
 发布后，`published-release.yml` 会在干净的 Linux、macOS 与 Windows runner 上下载不可变
 GitHub Release。每个 job 都会验证完整 `SHA256SUMS` manifest、本平台 archive 和 VSIX，
-解包后启动 `luna-tools`、`luna-fmt` 与 `luna-lsp`，并检查随包分发的兼容性 manifest。
+验证其 GitHub/Sigstore attestation 来自仓库 release workflow，解包后启动
+`luna-tools`、`luna-fmt` 与 `luna-lsp`，并检查随包分发的兼容性 manifest。

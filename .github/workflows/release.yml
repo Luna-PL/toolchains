@@ -169,6 +169,11 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Download package artifacts
         uses: actions/download-artifact@v7
@@ -183,16 +188,26 @@ jobs:
           cd dist
           sha256sum luna-* > SHA256SUMS
 
-      - name: Publish release
-        uses: softprops/action-gh-release@v3
+      - name: Attest release artifacts
+        uses: actions/attest@v4
         with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          name: LunaToolchain ${{ env.RELEASE_TAG }}
-          prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
-          generate_release_notes: true
-          fail_on_unmatched_files: true
-          files: |
+          subject-path: |
             dist/*.tar.gz
             dist/*.zip
             dist/*.vsix
             dist/SHA256SUMS
+
+      - name: Publish immutable release with gh
+        shell: bash
+        run: |
+          prerelease=()
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            prerelease+=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" \
+            dist/*.tar.gz dist/*.zip dist/*.vsix dist/SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "LunaToolchain $RELEASE_TAG" \
+            --generate-notes \
+            --verify-tag \
+            "${prerelease[@]}"

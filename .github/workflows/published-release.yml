@@ -9,7 +9,7 @@ on:
       tag:
         description: Existing toolchain release tag to verify
         required: true
-        default: v0.1.1
+        default: v0.1.2
         type: string
 
 permissions:
@@ -92,6 +92,19 @@ jobs:
           ARCHIVE_NAME: ${{ steps.assets.outputs.archive }}
           VSIX_NAME: ${{ steps.assets.outputs.vsix }}
         run: node scripts/release/verify-published-assets.js published "${{ env.RELEASE_TAG }}" "${{ env.ARCHIVE_NAME }}" "${{ env.VSIX_NAME }}"
+
+      - name: Verify GitHub artifact attestations
+        shell: bash
+        env:
+          ARCHIVE_NAME: ${{ steps.assets.outputs.archive }}
+          VSIX_NAME: ${{ steps.assets.outputs.vsix }}
+        run: |
+          for asset in "$ARCHIVE_NAME" "$VSIX_NAME" SHA256SUMS; do
+            gh attestation verify "published/$asset" \
+              --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
+              --deny-self-hosted-runners
+          done
 
       - name: Extract Unix archive
         if: matrix.archive-kind == 'tar.gz'

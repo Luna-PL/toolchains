@@ -4,7 +4,7 @@
 
 > Status: three-platform archive and VSIX packaging implemented
 
-Pushing an existing version tag such as `v0.1.1` runs the release workflow.
+Pushing an existing version tag such as `v0.1.2` runs the release workflow.
 A manual run accepts an existing tag as input. The tag must match the Cargo
 workspace, VS Code extension, Tree-sitter grammar, and compatibility-manifest
 versions.
@@ -52,5 +52,6 @@ packages. Development CI follows Luna `main` independently to detect drift.
 
 After publication, `published-release.yml` downloads the immutable GitHub Release on clean
 Linux, macOS, and Windows runners. Each job verifies the complete `SHA256SUMS` manifest and
-its platform archive and VSIX, extracts the archive, starts `luna-tools`, `luna-fmt`, and
+its platform archive and VSIX, verifies their GitHub/Sigstore attestations came from the
+repository release workflow, extracts the archive, starts `luna-tools`, `luna-fmt`, and
 `luna-lsp`, and checks the packaged compatibility manifest.
