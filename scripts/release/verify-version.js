@@ -17,6 +17,16 @@ const extension = JSON.parse(
 const grammar = JSON.parse(
   readFileSync(join(root, "grammars", "tree-sitter-luna", "package.json"), "utf8"),
 );
+const generatedParser = readFileSync(
+  join(root, "grammars", "tree-sitter-luna", "src", "parser.c"),
+  "utf8",
+);
+const generatedVersionParts = ["major", "minor", "patch"].map((part) =>
+  generatedParser.match(new RegExp(`\\.${part}_version = (\\d+),`))?.[1],
+);
+const generatedVersion = generatedVersionParts.every(Boolean)
+  ? generatedVersionParts.join(".")
+  : undefined;
 const compatibility = JSON.parse(
   readFileSync(join(root, "compatibility", "luna.json"), "utf8"),
 );
@@ -26,6 +36,7 @@ for (const [owner, version] of [
   ["Cargo workspace", cargoVersion],
   ["VS Code extension", extension.version],
   ["Tree-sitter grammar", grammar.version],
+  ["Tree-sitter generated parser", generatedVersion],
   ["compatibility manifest", compatibility.toolchain_version],
 ]) {
   if (version !== expected) {
