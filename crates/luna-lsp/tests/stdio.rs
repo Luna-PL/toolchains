@@ -352,7 +352,7 @@ fn optional_real_compiler_definition_follows_resolved_symbol_id() {
     assert!(messages.iter().any(|message| {
         message.get("id") == Some(&json!(4))
             && message.pointer("/result/range/start/line") == Some(&json!(3))
-            && message.pointer("/result/range/start/character") == Some(&json!(15))
+            && message.pointer("/result/range/start/character") == Some(&json!(7))
     }));
     assert!(messages.iter().any(|message| {
         message.get("id") == Some(&json!(5))
@@ -367,7 +367,7 @@ fn optional_real_compiler_definition_follows_resolved_symbol_id() {
     assert!(messages.iter().any(|message| {
         message.get("id") == Some(&json!(7))
             && message.pointer("/result/range/start/line") == Some(&json!(5))
-            && message.pointer("/result/range/start/character") == Some(&json!(15))
+            && message.pointer("/result/range/start/character") == Some(&json!(7))
     }));
 }
 

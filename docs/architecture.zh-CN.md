@@ -3,7 +3,7 @@
 [English](architecture.md) | [简体中文](architecture.zh-CN.md)
 
 > 状态：M3 语法和全文 formatter 已实现
-> 适用：LunaToolchain 0.1 开发期
+> 适用：LunaToolchain 0.2 开发期
 
 ## 依赖方向
 
@@ -50,9 +50,9 @@ folding 暂时仍使用 language server 的保守 scanner，后续仅在有明�
 ## 兼容性
 
 语言版本、编译器构建身份、诊断协议、分析协议、LSP 版本和编辑器扩展版本是不同
-身份。Luna 长期保持 `0.2.1` maintenance line 时仍须显式暴露协议不兼容；客户端按协议版本和
-compiler commit 决定是否启用功能。
+身份。Luna `0.3.0` 的语言身份不会掩盖协议不兼容；客户端按协议版本和 compiler commit
+决定是否启用功能。analysis 字符串开放枚举的未知值必须降级处理，而不改变 v1 record envelope。
 
 三平台开发 CI 跟踪 Luna 默认分支的源码 fixture，以立即暴露语言漂移；手动运行可
-指定 branch、tag 或 commit。Release 产物则固定兼容的 Luna release tag，保证已发布
-package 可复现。
+指定 branch、tag 或 commit。Release 产物固定已验证的 Luna 精确源码 commit，保证
+在 Luna 正式 tag 之前形成的候选发布同样可复现。

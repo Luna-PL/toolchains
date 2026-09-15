@@ -62,7 +62,7 @@ package 范围的 `textDocument/references` 和有意限制的 0.2.x package ren
 已实现；开发者 task 与 cache 命令仍在规划中。
 
 - check/build/run/test task、测试选择、workspace 状态和本地缓存报告。
-- `luna-lsp` 预编译产物、VSIX、checksum，以及绑定 compiler release 与协议版本的
+- `luna-lsp` 预编译产物、VSIX、checksum，以及绑定已验证 compiler 精确 commit 与协议版本的
   compatibility matrix。
 
-远程 registry、调试器和语言表面扩张不属于 0.1 计划。
+远程 registry、调试器和语言表面扩张不属于 0.2 计划。

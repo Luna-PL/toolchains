@@ -10,9 +10,9 @@
     }
   ],
   "metadata": {
-    "version": "0.1.2",
+    "version": "0.2.0",
     "license": "MIT OR Apache-2.0",
-    "description": "Lossless structural grammar for Luna 0.2 alpha",
+    "description": "Lossless structural grammar for Luna 0.3 alpha",
     "authors": [
       {
         "name": "LunaToolchain contributors"

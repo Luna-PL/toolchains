@@ -31,6 +31,7 @@ const compatibility = JSON.parse(
   readFileSync(join(root, "compatibility", "luna.json"), "utf8"),
 );
 const expected = releaseTag.slice(1);
+const luna = compatibility.luna;
 
 for (const [owner, version] of [
   ["Cargo workspace", cargoVersion],
@@ -44,4 +45,18 @@ for (const [owner, version] of [
   }
 }
 
-console.log(`release versions agree on ${expected}`);
+if (!/^v\d+\.\d+\.\d+$/.test(luna?.release_tag ?? "")) {
+  throw new Error(`invalid Luna release tag: ${luna?.release_tag ?? "<missing>"}`);
+}
+if (luna.release_tag !== `v${luna.language_version}`) {
+  throw new Error(
+    `Luna release tag ${luna.release_tag} does not match language version ${luna.language_version}`,
+  );
+}
+if (!/^[0-9a-f]{40}$/.test(luna.source_commit ?? "")) {
+  throw new Error("Luna source_commit must be a full lowercase 40-hex SHA");
+}
+
+console.log(
+  `release versions agree on ${expected}; Luna baseline is ${luna.release_tag} (${luna.source_commit})`,
+);

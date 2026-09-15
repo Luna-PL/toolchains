@@ -9,7 +9,7 @@ on:
       tag:
         description: Existing toolchain release tag to verify
         required: true
-        default: v0.1.2
+        default: v0.2.0
         type: string
 
 permissions:
@@ -52,7 +52,7 @@ jobs:
       - name: Check out verification scripts
         uses: actions/checkout@v6
         with:
-          ref: main
+          ref: ${{ env.RELEASE_TAG }}
           persist-credentials: false
 
       - name: Install Node.js 24
@@ -83,6 +83,7 @@ jobs:
           gh release download "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --dir published \
+            --pattern LUNA-SOURCE-COMMIT \
             --pattern SHA256SUMS \
             --pattern "$ARCHIVE_NAME" \
             --pattern "$VSIX_NAME"
@@ -91,7 +92,7 @@ jobs:
         env:
           ARCHIVE_NAME: ${{ steps.assets.outputs.archive }}
           VSIX_NAME: ${{ steps.assets.outputs.vsix }}
-        run: node scripts/release/verify-published-assets.js published "${{ env.RELEASE_TAG }}" "${{ env.ARCHIVE_NAME }}" "${{ env.VSIX_NAME }}"
+        run: node scripts/release/verify-published-assets.js published "${{ env.RELEASE_TAG }}" LUNA-SOURCE-COMMIT "${{ env.ARCHIVE_NAME }}" "${{ env.VSIX_NAME }}"
 
       - name: Verify GitHub artifact attestations
         shell: bash
@@ -99,7 +100,7 @@ jobs:
           ARCHIVE_NAME: ${{ steps.assets.outputs.archive }}
           VSIX_NAME: ${{ steps.assets.outputs.vsix }}
         run: |
-          for asset in "$ARCHIVE_NAME" "$VSIX_NAME" SHA256SUMS; do
+          for asset in LUNA-SOURCE-COMMIT "$ARCHIVE_NAME" "$VSIX_NAME" SHA256SUMS; do
             gh attestation verify "published/$asset" \
               --repo "$GITHUB_REPOSITORY" \
               --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \

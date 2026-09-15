@@ -98,13 +98,13 @@ pub enum Record {
     },
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SymbolKind {
     Function,
     Kernel,
     Method,
     Fragment,
+    Slot,
     Struct,
     Enum,
     Trait,
@@ -112,6 +112,60 @@ pub enum SymbolKind {
     Constraint,
     Field,
     EnumVariant,
+    Unknown,
+}
+
+impl SymbolKind {
+    pub const fn wire_name(self) -> &'static str {
+        match self {
+            Self::Function => "function",
+            Self::Kernel => "kernel",
+            Self::Method => "method",
+            Self::Fragment => "fragment",
+            Self::Slot => "slot",
+            Self::Struct => "struct",
+            Self::Enum => "enum",
+            Self::Trait => "trait",
+            Self::Metadata => "metadata",
+            Self::Constraint => "constraint",
+            Self::Field => "field",
+            Self::EnumVariant => "enum-variant",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for SymbolKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "function" => Self::Function,
+            "kernel" => Self::Kernel,
+            "method" => Self::Method,
+            "fragment" => Self::Fragment,
+            "slot" => Self::Slot,
+            "struct" => Self::Struct,
+            "enum" => Self::Enum,
+            "trait" => Self::Trait,
+            "metadata" => Self::Metadata,
+            "constraint" => Self::Constraint,
+            "field" => Self::Field,
+            "enum-variant" => Self::EnumVariant,
+            _ => Self::Unknown,
+        })
+    }
+}
+
+impl Serialize for SymbolKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.wire_name())
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -487,6 +541,7 @@ mod tests {
         for (wire_name, expected) in [
             ("field", SymbolKind::Field),
             ("enum-variant", SymbolKind::EnumVariant),
+            ("slot", SymbolKind::Slot),
         ] {
             let encoded = format!("\"{wire_name}\"");
             assert_eq!(
@@ -495,6 +550,31 @@ mod tests {
                 expected
             );
         }
+    }
+
+    #[test]
+    fn degrades_unknown_symbol_kinds_without_rejecting_the_stream() {
+        assert_eq!(
+            serde_json::from_str::<SymbolKind>("\"future-control-kind\"")
+                .expect("unknown symbol kinds must remain forward compatible"),
+            SymbolKind::Unknown
+        );
+
+        let future_stream = ANALYSIS_GOLDEN.replace(
+            "\"symbol_kind\":\"function\"",
+            "\"symbol_kind\":\"future-control-kind\"",
+        );
+        let records = parse_analysis_jsonl(&future_stream)
+            .expect("an unknown symbol kind must not invalidate analysis JSONL");
+        validate_analysis_sequence(&records)
+            .expect("an unknown symbol kind must not invalidate the record sequence");
+        assert!(matches!(
+            records.get(1),
+            Some(AnalysisRecord::Symbol {
+                symbol_kind: SymbolKind::Unknown,
+                ..
+            })
+        ));
     }
 
     #[test]

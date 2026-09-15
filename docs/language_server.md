@@ -51,10 +51,11 @@ small Luna 0.2.x package rename. They are enabled only with
 `package-references` and the symbol's explicit reference capability, and edit
 the declaration plus all matching Symbol ID references in the current complete
 snapshot. Function, method, struct, enum, trait, field, and enum-variant symbols
-are supported. Locals, parameters, metadata, constraints, kernels, fragments,
+are supported. Locals, parameters, metadata, constraints, kernels, slots, fragments,
 anonymous-record fields, file renames, collision prediction, and persistent
 cross-package indexing are outside this compatibility implementation. Hover
-and completion remain disabled.
+and completion remain disabled. Unknown future analysis symbol kinds are shown
+as generic objects and never enable rename.
 
 `textDocument/references` is advertised only with `package-references`. A
 request may start on a declaration or any emitted reference and returns all

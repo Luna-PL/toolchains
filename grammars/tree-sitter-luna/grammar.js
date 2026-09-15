@@ -7,6 +7,7 @@ const DECLARATION_KEYWORDS = [
   "enum",
   "trait",
   "impl",
+  "slot",
   "interceptor",
   "context",
   "meta",
@@ -18,9 +19,7 @@ const MODIFIERS = [
   "constexpr",
   "extern",
   "kernel",
-  "nominal",
   "runtime",
-  "dynamic",
 ];
 
 module.exports = grammar({

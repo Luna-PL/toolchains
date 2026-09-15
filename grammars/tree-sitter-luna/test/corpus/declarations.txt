@@ -11,7 +11,7 @@ export runtime@release(1, 0, 0) fn main() -> i32 {
   return 0;
 }
 
-nominal struct Point {
+struct Point {
   x: i32;
   y: i32;
 }

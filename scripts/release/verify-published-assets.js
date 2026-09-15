@@ -12,6 +12,7 @@ if (downloadedNames.length === 0) {
 
 const version = releaseTag.slice(1);
 const expectedNames = [
+  "LUNA-SOURCE-COMMIT",
   `luna-language-${releaseTag}-darwin-arm64.vsix`,
   `luna-language-${releaseTag}-linux-x64.vsix`,
   `luna-language-${releaseTag}-win32-x64.vsix`,
@@ -52,6 +53,19 @@ for (const name of downloadedNames) {
     throw new Error(`checksum mismatch for ${name}`);
   }
   console.log(`${name}: ${digest}`);
+}
+
+const compatibility = JSON.parse(
+  readFileSync(join(__dirname, "..", "..", "compatibility", "luna.json"), "utf8"),
+);
+const publishedLunaCommit = readFileSync(
+  join(directory, "LUNA-SOURCE-COMMIT"),
+  "utf8",
+).trim();
+if (publishedLunaCommit !== compatibility.luna?.source_commit) {
+  throw new Error(
+    `published Luna source commit ${publishedLunaCommit} does not match compatibility metadata`,
+  );
 }
 
 console.log(`complete ${releaseTag} checksum manifest verified`);

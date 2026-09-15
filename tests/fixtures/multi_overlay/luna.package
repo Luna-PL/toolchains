@@ -1,6 +1,7 @@
 [package]
 id = "org.luna.toolchain.multi_overlay"
 version = "0.1.0"
+kind = "application"
 sources = ["src"]
 
 [dependencies]

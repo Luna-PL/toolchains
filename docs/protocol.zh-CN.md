@@ -20,8 +20,8 @@
 ## 必需身份
 
 `hello` 必须携带语言版本、编译器源码 commit、构建 target、诊断协议名称/版本和
-可选 capability。客户端必须在解释诊断前拒绝不支持的主版本。由于 Luna 长期保持
-`0.2.1`，compiler commit 仍是必要身份。
+可选 capability。客户端必须在解释诊断前拒绝不支持的主版本。当前语言版本为
+`0.3.0`；compiler commit 仍是必要身份。
 
 ## 诊断记录
 
@@ -108,6 +108,10 @@ trait method 调用；`type-references` 覆盖类型语法中已解析的用户�
 `trait-references` 覆盖 impl 和 bound 中的 trait 名。
 `field-references` 和 `enum-variant-references` 使用由编译器已解析父声明派生的
 成员 Symbol ID。
+
+analysis v1 的字符串词汇（包括 `symbol_kind`）都是开放枚举。`slot` 与 `fragment`
+标识当前控制声明，但不冻结其语言语义。客户端必须接收未来未知值并关闭不支持的
+功能，不能因此拒绝其余部分有效的协议流。
 
 Rust wire type 和序列校验已经在 `luna-protocol` 中实现；配套编译器生产端及按
 capability 开关的 `luna-compiler` 客户端也已实现。完整保存文件快照具备任一已广告的

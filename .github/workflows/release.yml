@@ -40,11 +40,11 @@ jobs:
       - name: Verify release versions
         run: node scripts/release/verify-version.js
 
-      - name: Read compatibility baseline
+      - name: Read exact compatibility baseline
         id: metadata
         shell: bash
         run: |
-          luna_ref="$(node -p "require('./compatibility/luna.json').luna.release_tag")"
+          luna_ref="$(node -p "require('./compatibility/luna.json').luna.source_commit")"
           test -n "$luna_ref"
           echo "luna_ref=$luna_ref" >> "$GITHUB_OUTPUT"
           echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
@@ -165,7 +165,9 @@ jobs:
 
   publish:
     name: Publish GitHub Release
-    needs: package
+    needs:
+      - release-metadata
+      - package
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -186,12 +188,14 @@ jobs:
         shell: bash
         run: |
           cd dist
-          sha256sum luna-* > SHA256SUMS
+          printf '%s\n' '${{ needs.release-metadata.outputs.luna_ref }}' > LUNA-SOURCE-COMMIT
+          sha256sum LUNA-SOURCE-COMMIT luna-* > SHA256SUMS
 
       - name: Attest release artifacts
         uses: actions/attest@v4
         with:
           subject-path: |
+            dist/LUNA-SOURCE-COMMIT
             dist/*.tar.gz
             dist/*.zip
             dist/*.vsix
@@ -205,7 +209,7 @@ jobs:
             prerelease+=(--prerelease)
           fi
           gh release create "$RELEASE_TAG" \
-            dist/*.tar.gz dist/*.zip dist/*.vsix dist/SHA256SUMS \
+            dist/LUNA-SOURCE-COMMIT dist/*.tar.gz dist/*.zip dist/*.vsix dist/SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" \
             --title "LunaToolchain $RELEASE_TAG" \
             --generate-notes \

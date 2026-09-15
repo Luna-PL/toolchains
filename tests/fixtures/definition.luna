@@ -1,7 +1,7 @@
 fn answer() -> i32 {
     return 42;
 }
-nominal struct Box {
+struct Box {
     value: i32;
 }
 fn keep(affine value: Box) -> affine Box {

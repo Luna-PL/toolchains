@@ -22,7 +22,7 @@ Human output and JSONL must never be mixed on the protocol stream. Exit status
 
 The `hello` record carries:
 
-- language version (`0.2.1`);
+- language version (`0.3.0`);
 - compiler source commit and build target;
 - diagnostic protocol name/version;
 - supported optional capabilities.
@@ -126,6 +126,11 @@ calls through `method-references`. `type-references` covers resolved user type
 names in type syntax; `trait-references` covers impl and bound trait names.
 `field-references` and `enum-variant-references` use child Symbol IDs whose
 identity is derived from the compiler-resolved parent declaration.
+
+String vocabularies in analysis v1, including `symbol_kind`, are open enums.
+`slot` and `fragment` identify the current control declarations but do not
+freeze their language semantics. Clients accept unknown future values and
+degrade unsupported features instead of rejecting an otherwise valid stream.
 
 The Rust wire types and sequence validator are implemented in
 `luna-protocol`. The companion compiler producer and capability-gated

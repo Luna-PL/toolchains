@@ -132,7 +132,7 @@ impl Server {
                             json!({"prepareProvider": true})
                         )
                     },
-                    "serverInfo": {"name": "luna-lsp", "version": "0.1.2"}
+                    "serverInfo": {"name": "luna-lsp", "version": "0.2.0"}
                 }),
             );
         }
@@ -942,8 +942,10 @@ fn analysis_supports_rename(records: &[AnalysisRecord], kind: SymbolKind) -> boo
         SymbolKind::EnumVariant => supports("enum-variant-references"),
         SymbolKind::Kernel
         | SymbolKind::Fragment
+        | SymbolKind::Slot
         | SymbolKind::Metadata
-        | SymbolKind::Constraint => false,
+        | SymbolKind::Constraint
+        | SymbolKind::Unknown => false,
     }
 }
 
@@ -976,7 +978,6 @@ fn is_luna_identifier(name: &str) -> bool {
             | "with"
             | "runtime"
             | "dynamic"
-            | "nominal"
             | "kernel"
             | "launch"
             | "await"
@@ -1061,7 +1062,7 @@ fn analysis_location(span: &Span, documents: &HashMap<String, Document>) -> Valu
 
 fn lsp_symbol_kind(kind: SymbolKind) -> u32 {
     match kind {
-        SymbolKind::Function | SymbolKind::Kernel | SymbolKind::Fragment => 12,
+        SymbolKind::Function | SymbolKind::Kernel | SymbolKind::Fragment | SymbolKind::Slot => 12,
         SymbolKind::Method => 6,
         SymbolKind::Struct => 23,
         SymbolKind::Enum => 10,
@@ -1069,6 +1070,7 @@ fn lsp_symbol_kind(kind: SymbolKind) -> u32 {
         SymbolKind::Metadata => 19,
         SymbolKind::Field => 8,
         SymbolKind::EnumVariant => 22,
+        SymbolKind::Unknown => 19,
     }
 }
 
@@ -1398,6 +1400,8 @@ mod tests {
     fn member_symbols_use_lsp_member_kinds() {
         assert_eq!(lsp_symbol_kind(SymbolKind::Field), 8);
         assert_eq!(lsp_symbol_kind(SymbolKind::EnumVariant), 22);
+        assert_eq!(lsp_symbol_kind(SymbolKind::Slot), 12);
+        assert_eq!(lsp_symbol_kind(SymbolKind::Unknown), 19);
     }
 
     #[test]

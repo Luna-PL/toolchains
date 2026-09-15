@@ -40,9 +40,10 @@ trait 名称、struct 字段以及 enum 构造/match variant。
 `textDocument/prepareRename` 和 `textDocument/rename` 提供有意收紧的 Luna 0.2.x
 package rename。只有同时具备 `package-references` 和该符号对应引用 capability 时才启用，
 并且只编辑当前完整快照中的声明及相同 Symbol ID 引用。支持 function、method、struct、
-enum、trait、field 和 enum variant。局部变量、参数、metadata、constraint、kernel、fragment、
+enum、trait、field 和 enum variant。局部变量、参数、metadata、constraint、kernel、slot、fragment、
 匿名 record 字段、文件改名、冲突预测和持久化跨 package 索引不在这个兼容实现内。
-hover 和 completion 仍保持禁用。
+hover 和 completion 仍保持禁用。未来未知 analysis symbol kind 会显示为通用 object，
+且绝不会启用 rename。
 
 仅当编译器报告 `package-references` 时才声明 `textDocument/references`。请求可以从声明或
 任意已输出引用位置发起，并返回当前完整 package 快照中的所有匹配位置；它遵守

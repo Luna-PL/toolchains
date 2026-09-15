@@ -132,6 +132,10 @@
             "named": false
           },
           {
+            "type": "slot",
+            "named": false
+          },
+          {
             "type": "struct",
             "named": false
           },
@@ -403,10 +407,6 @@
     "named": false
   },
   {
-    "type": "dynamic",
-    "named": false
-  },
-  {
     "type": "enum",
     "named": false
   },
@@ -452,10 +452,6 @@
     "named": false
   },
   {
-    "type": "nominal",
-    "named": false
-  },
-  {
     "type": "number",
     "named": true
   },
@@ -473,6 +469,10 @@
   },
   {
     "type": "runtime",
+    "named": false
+  },
+  {
+    "type": "slot",
     "named": false
   },
   {

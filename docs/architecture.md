@@ -3,7 +3,7 @@
 [English](architecture.md) | [简体中文](architecture.zh-CN.md)
 
 > Status: M3 syntax and full-document formatter implemented
-> Applies to: LunaToolchain 0.1 development
+> Applies to: LunaToolchain 0.2 development
 
 ## Dependency direction
 
@@ -58,10 +58,12 @@ own measured benefit and compatibility tests.
 
 The language version, compiler build identity, diagnostic protocol, analysis
 protocol, LSP release, and editor-extension release are separate identities.
-Luna remaining on the `0.2.1` maintenance line must not hide protocol incompatibility; clients
-gate features on explicit protocol versions and compiler commit metadata.
+Luna `0.3.0` language identity does not hide protocol incompatibility; clients
+gate features on explicit protocol versions and compiler commit metadata. Open
+analysis string vocabularies degrade unknown values without changing the v1
+record envelope.
 
 The three-platform development CI follows the Luna default branch for source
 fixture conformance, exposing language drift immediately. Manual runs can test
-an explicit branch, tag, or commit. Release artifacts instead pin a compatible
-Luna release tag so published packages remain reproducible.
+an explicit branch, tag, or commit. Release artifacts instead pin the exact
+validated Luna source commit so pre-tag candidate releases remain reproducible.

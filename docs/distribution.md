@@ -4,13 +4,13 @@
 
 > Status: three-platform archive and VSIX packaging implemented
 
-Pushing an existing version tag such as `v0.1.2` runs the release workflow.
+Pushing an existing version tag such as `v0.2.0` runs the release workflow.
 A manual run accepts an existing tag as input. The tag must match the Cargo
 workspace, VS Code extension, Tree-sitter grammar, and compatibility-manifest
 versions.
 
 Before packaging starts, the release workflow reuses the complete Toolchain CI against the
-exact Luna release tag declared by `compatibility/luna.json`. All three platform jobs and the
+exact Luna source commit declared by `compatibility/luna.json`. All three platform jobs and the
 mandatory real-compiler integration job must pass; publication cannot run in parallel with or
 bypass that compatibility gate.
 
@@ -20,6 +20,7 @@ Each release contains:
 - `luna-toolchain-<version>-macos-arm64.tar.gz`
 - `luna-toolchain-<version>-windows-x86_64.zip`
 - platform-specific `luna-language-*.vsix` packages
+- `LUNA-SOURCE-COMMIT`
 - `SHA256SUMS`
 
 The archive contains `luna-lsp`, `luna-fmt`, `luna-tools`, English and Chinese
@@ -46,12 +47,12 @@ path settings use those bundled binaries first, then fall back to `PATH`.
 Compiler-backed diagnostics still require a compatible Luna compiler installed
 separately or configured with `luna.compiler.path`/`LUNA_BIN`.
 
-Release compatibility is declarative: `compatibility/luna.json` pins the Luna
-release tag, language version, and diagnostic protocol supported by published
-packages. Development CI follows Luna `main` independently to detect drift.
+Release compatibility is declarative: `compatibility/luna.json` pins the exact
+Luna source commit and records its intended release tag, language version, and
+protocols. Development CI follows Luna `main` independently to detect drift.
 
 After publication, `published-release.yml` downloads the immutable GitHub Release on clean
-Linux, macOS, and Windows runners. Each job verifies the complete `SHA256SUMS` manifest and
-its platform archive and VSIX, verifies their GitHub/Sigstore attestations came from the
+Linux, macOS, and Windows runners. Each job verifies the complete `SHA256SUMS` manifest,
+the Luna source-commit asset, and its platform archive and VSIX; verifies their GitHub/Sigstore attestations came from the
 repository release workflow, extracts the archive, starts `luna-tools`, `luna-fmt`, and
 `luna-lsp`, and checks the packaged compatibility manifest.

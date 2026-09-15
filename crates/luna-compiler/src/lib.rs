@@ -704,7 +704,7 @@ mod tests {
             executable: path.to_path_buf(),
             source,
             identity: CompilerIdentity {
-                language_version: "0.2.1".to_owned(),
+                language_version: "0.3.0".to_owned(),
                 compiler_commit: "test".to_owned(),
                 build_target: "test-target".to_owned(),
                 diagnostic_protocol_version: 1,
@@ -816,7 +816,7 @@ mod tests {
         let compiler = identity_from_outputs(
             Path::new("luna"),
             CandidateSource::Explicit,
-            "0.2.1",
+            "0.3.0",
             GOLDEN,
         )
         .expect("golden identity must be accepted");
@@ -902,6 +902,24 @@ mod tests {
                 ..
             })
         ));
+
+        let control_source = luna_source_root().join("examples/fragments.luna");
+        let control_analysis = analyze_saved(&compiler, &control_source)
+            .expect("LUNA_BIN analysis must accept the open Slot/Fragment symbol vocabulary");
+        assert!(control_analysis.records.iter().any(|record| matches!(
+            record,
+            AnalysisRecord::Symbol {
+                symbol_kind: luna_protocol::SymbolKind::Slot,
+                ..
+            }
+        )));
+        assert!(control_analysis.records.iter().any(|record| matches!(
+            record,
+            AnalysisRecord::Symbol {
+                symbol_kind: luna_protocol::SymbolKind::Fragment,
+                ..
+            }
+        )));
 
         if has_analysis_capability(&compiler, "single-document-overlay") {
             let overlaid = analyze_overlay(

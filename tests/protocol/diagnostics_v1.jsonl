@@ -1,3 +1,3 @@
-{"protocol":"luna.diagnostic","version":1,"kind":"hello","language_version":"0.2.1","compiler_commit":"0123456789abcdef","build_target":"x86_64-unknown-linux-gnu","capabilities":["byte-spans"]}
+{"protocol":"luna.diagnostic","version":1,"kind":"hello","language_version":"0.3.0","compiler_commit":"0123456789abcdef","build_target":"x86_64-unknown-linux-gnu","capabilities":["byte-spans"]}
 {"protocol":"luna.diagnostic","version":1,"kind":"diagnostic","severity":"error","phase":"semantic","code":"SEM0001","message":"undefined name 'value'","primary":{"path":"/workspace/main.luna","start":{"byte":42,"line":3,"column":9},"end":{"byte":47,"line":3,"column":14}},"labels":[],"notes":[],"fixes":[]}
 {"protocol":"luna.diagnostic","version":1,"kind":"summary","errors":1,"warnings":0,"success":false}

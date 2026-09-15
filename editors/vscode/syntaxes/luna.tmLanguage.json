@@ -49,7 +49,7 @@
         },
         {
           "name": "storage.type.luna",
-          "match": "\\b(?:fn|let|struct|record|enum|trait|impl|package|module|using|export|extern|linear|nominal|metadata|selector|fragment|interceptor|context|slot|apply|new|rc|arc)\\b"
+          "match": "\\b(?:fn|let|struct|record|enum|trait|impl|package|module|using|export|extern|linear|meta|constraint|fragment|interceptor|context|slot|apply|new|rc|arc)\\b"
         },
         {
           "name": "constant.language.luna",

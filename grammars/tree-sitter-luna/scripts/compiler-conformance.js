@@ -49,7 +49,6 @@ const fixtures = [
   "examples/full_showcase/app/src/main.luna",
   "tests/fixtures/result_match.luna",
   "tests/fixtures/iterator_pipeline.luna",
-  "tests/fixtures/dynamic_fragments.luna",
   "tests/fixtures/comparison_operators.luna",
   "tests/fixtures/type_relations.luna",
 ];

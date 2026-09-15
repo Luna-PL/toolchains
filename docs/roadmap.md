@@ -71,7 +71,7 @@ cache commands remain planned.
 - Check/build/run/test tasks, test selection, workspace status, and local cache
   reporting.
 - Prebuilt `luna-lsp` artifacts, VSIX packaging, checksums, and a compatibility
-  matrix pinned to compiler releases and protocol versions.
+  matrix pinned to exact validated compiler commits and protocol versions.
 
 Remote registries, debugger support, and language-surface expansion are not in
-the 0.1 plan.
+the 0.2 plan.

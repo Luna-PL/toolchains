@@ -166,15 +166,7 @@
               },
               {
                 "type": "STRING",
-                "value": "nominal"
-              },
-              {
-                "type": "STRING",
                 "value": "runtime"
-              },
-              {
-                "type": "STRING",
-                "value": "dynamic"
               }
             ]
           }
@@ -220,6 +212,10 @@
               {
                 "type": "STRING",
                 "value": "impl"
+              },
+              {
+                "type": "STRING",
+                "value": "slot"
               },
               {
                 "type": "STRING",

@@ -26,14 +26,7 @@ fn declaration_symbol(line_number: u32, line: &str) -> Option<Value> {
     let leading_bytes = code.len() - trimmed.len();
     let mut words = trimmed.split_whitespace();
     let mut keyword = words.next()?;
-    const MODIFIERS: &[&str] = &[
-        "export",
-        "nominal",
-        "constexpr",
-        "extern",
-        "kernel",
-        "runtime",
-    ];
+    const MODIFIERS: &[&str] = &["export", "constexpr", "extern", "kernel", "runtime"];
     while MODIFIERS.contains(&keyword) {
         keyword = words.next()?;
     }
@@ -43,11 +36,18 @@ fn declaration_symbol(line_number: u32, line: &str) -> Option<Value> {
         "enum" => 10,
         "trait" | "constraint" => 11,
         "impl" => 5,
-        "fragment" | "interceptor" | "context" => 12,
+        "fragment" | "slot" | "interceptor" | "context" => 12,
         "meta" => 19,
         _ => return None,
     };
-    let raw_name = words.next()?;
+    let raw_name = if keyword == "slot" {
+        match words.next()? {
+            "interceptor" | "context" => words.next()?,
+            _ => return None,
+        }
+    } else {
+        words.next()?
+    };
     let name: String = raw_name
         .chars()
         .take_while(|character| character.is_alphanumeric() || *character == '_')
@@ -217,11 +217,18 @@ mod tests {
 
     #[test]
     fn extracts_symbols_without_claiming_semantics() {
-        let symbols =
-            document_symbols("export fn main() -> i32 {\n}\nnominal struct Point { x: i32; }\n");
+        let symbols = document_symbols("export fn main() -> i32 {\n}\nstruct Point { x: i32; }\n");
         assert_eq!(symbols.len(), 2);
         assert_eq!(symbols[0]["name"], "main");
         assert_eq!(symbols[1]["name"], "Point");
+    }
+
+    #[test]
+    fn extracts_the_slot_name_after_its_open_control_contract() {
+        let symbols = document_symbols("slot context pipeline(value: i32);\n");
+        assert_eq!(symbols.len(), 1);
+        assert_eq!(symbols[0]["name"], "pipeline");
+        assert_eq!(symbols[0]["kind"], 12);
     }
 
     #[test]

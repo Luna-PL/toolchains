@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-LunaToolchain 是 Luna `0.2.1` 的独立编辑器与开发者工具工作区。本地开发时
+LunaToolchain 是 Luna `0.3.0` 的独立编辑器与开发者工具工作区。本地开发时
 它位于编译器目录内，但具有独立的 Git 历史、发布、兼容策略和版本号。
 
 当前状态为 M4 语义工具进行中。`luna-protocol` 校验诊断和分析 JSONL，
@@ -44,7 +44,8 @@ cargo run --offline -p luna-tools -- compiler --luna /path/to/luna
 grammar conformance 跟踪 `Luna-PL/Luna:main`，以尽早发现语言漂移；手动运行时可以
 指定任意 Luna branch、tag 或 commit。独立 Linux job 会构建该精确 ref，并强制运行
 真实编译器协议、formatter corpus、definition、reference、rename 与多文档 overlay
-测试。发布兼容性仍单独固定到 Luna release tag。
+测试。发布兼容性单独固定到已验证的 Luna 精确源码 commit，同时把预期 Luna
+release tag 记录为元数据。
 
 ## Release
 

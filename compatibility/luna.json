@@ -1,9 +1,10 @@
 {
   "schema_version": 2,
-  "toolchain_version": "0.1.2",
+  "toolchain_version": "0.2.0",
   "luna": {
-    "language_version": "0.2.1",
-    "release_tag": "v0.2.1",
+    "language_version": "0.3.0",
+    "release_tag": "v0.3.0",
+    "source_commit": "71d40c5144bee7292cb7a390fdfda71cd7e59469",
     "diagnostic_protocol": 1,
     "analysis_protocol": 1,
     "required_diagnostic_capabilities": ["byte-spans"],
