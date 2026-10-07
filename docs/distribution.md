@@ -4,7 +4,7 @@
 
 > Status: three-platform archive and VSIX packaging implemented
 
-Pushing an existing version tag such as `v0.2.0` runs the release workflow.
+Pushing an existing version tag such as `v0.2.1` runs the release workflow.
 A manual run accepts an existing tag as input. The tag must match the Cargo
 workspace, VS Code extension, Tree-sitter grammar, and compatibility-manifest
 versions.

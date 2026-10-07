@@ -132,7 +132,7 @@ impl Server {
                             json!({"prepareProvider": true})
                         )
                     },
-                    "serverInfo": {"name": "luna-lsp", "version": "0.2.0"}
+                    "serverInfo": {"name": "luna-lsp", "version": "0.2.1"}
                 }),
             );
         }
