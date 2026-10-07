@@ -120,6 +120,10 @@
             "named": false
           },
           {
+            "type": "fragment",
+            "named": false
+          },
+          {
             "type": "impl",
             "named": false
           },
@@ -420,6 +424,10 @@
   },
   {
     "type": "fn",
+    "named": false
+  },
+  {
+    "type": "fragment",
     "named": false
   },
   {

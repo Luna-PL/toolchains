@@ -219,6 +219,10 @@
               },
               {
                 "type": "STRING",
+                "value": "fragment"
+              },
+              {
+                "type": "STRING",
                 "value": "interceptor"
               },
               {

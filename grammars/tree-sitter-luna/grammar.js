@@ -8,6 +8,7 @@ const DECLARATION_KEYWORDS = [
   "trait",
   "impl",
   "slot",
+  "fragment",
   "interceptor",
   "context",
   "meta",
